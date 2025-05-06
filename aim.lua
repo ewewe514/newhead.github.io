@@ -66,7 +66,8 @@ local function autoHeadshotLoop()
         local tool = getEquippedSupportedWeapon() -- Get the equipped weapon
         local closestNPC = findClosestNPC()
 
-        if tool and closestNPC and closestNPC.distance <= SHOOT_RADIUS then
+        -- Ensure a valid NPC exists before shooting
+        if tool and closestNPC and closestNPC.head and closestNPC.distance <= SHOOT_RADIUS then
             local pelletTable = {}
 
             -- Ensure shotgun types fire multiple pellets
@@ -91,7 +92,7 @@ local function autoHeadshotLoop()
                 ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
             end
         else
-            print("No valid target found, NOT shooting!")
+            print("No valid target found, NOT shooting!") -- Prevents unnecessary firing
         end
 
         task.wait(0.05) -- Prevents crashes while maintaining high fire rate
