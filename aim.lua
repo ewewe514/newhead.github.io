@@ -1,45 +1,55 @@
-autoCollectRunning = true
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+local runService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
 
-local function collectItems()
-    if not workspace:FindFirstChild("RuntimeItems") then return end
+local aimLockLoop
 
-    local items = {
-        workspace.RuntimeItems:FindFirstChild("Rifle"),
-        workspace.RuntimeItems:FindFirstChild("RifleAmmo"),
-        workspace.RuntimeItems:FindFirstChild("Bandage"),
-        workspace.RuntimeItems:FindFirstChild("Shotgun"),
-        workspace.RuntimeItems:FindFirstChild("Revolver"),
-        workspace.RuntimeItems:FindFirstChild("ShotgunShells"),
-        workspace.RuntimeItems:FindFirstChild("Molotov"),
-        workspace.RuntimeItems:FindFirstChild("RevolverAmmo"),
-        workspace.RuntimeItems:FindFirstChild("Mauser"),
-        workspace.RuntimeItems:FindFirstChild("Snake Oil"),
-        workspace.RuntimeItems:FindFirstChild("Shovel"),
-        workspace.RuntimeItems:FindFirstChild("OpenableCrate"),
-        workspace.RuntimeItems:FindFirstChild("Navy Revolver"),
-        workspace.RuntimeItems:FindFirstChild("Bolt Action Rifle"),
-        workspace.RuntimeItems:FindFirstChild("Holy Water"),
-        workspace.RuntimeItems:FindFirstChild("Electrocutioner"),
-        workspace.RuntimeItems:FindFirstChild("Vampire Knife")
-    }
-
-    local rs = game:GetService("ReplicatedStorage")
-
-    local activateRemote = rs:WaitForChild("Packages"):WaitForChild("RemotePromise"):WaitForChild("Remotes"):WaitForChild("C_ActivateObject")
-
-    if not activateRemote then return end
-
-    for _, item in pairs(items) do
-        if item then
-            local args = { item }
-            activateRemote:FireServer(unpack(args))
-        end
+local function stopAimLock()
+    if aimLockLoop then
+        aimLockLoop:Disconnect()
+        aimLockLoop = nil
+    end
+    if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+        camera.CameraSubject = player.Character:FindFirstChildOfClass("Humanoid")
     end
 end
 
-task.spawn(function()
-    while autoCollectRunning do
-        task.wait(0.4)
-        pcall(collectItems)
-    end
+local function startAimLock()
+    stopAimLock()
+
+    aimLockLoop = runService.RenderStepped:Connect(function()
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+
+        local closestNPC = nil
+        local closestDistance = math.huge
+
+        for _, npc in ipairs(workspace:GetDescendants()) do
+            if npc:IsA("Model") and npc ~= player.Character and not Players:GetPlayerFromCharacter(npc) then
+                local humanoid = npc:FindFirstChildOfClass("Humanoid")
+                local hrp = npc:FindFirstChild("HumanoidRootPart")
+
+                if humanoid and hrp and humanoid.Health > 0 then
+                    local distance = (hrp.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    if distance < closestDistance then
+                        closestDistance = distance
+                        closestNPC = npc
+                    end
+                end
+            end
+        end
+
+        if closestNPC then
+            camera.CameraSubject = closestNPC:FindFirstChildOfClass("Humanoid")
+        else
+            camera.CameraSubject = player.Character:FindFirstChildOfClass("Humanoid")
+        end
+    end)
+end
+
+player.CameraMode = Enum.CameraMode.Classic
+startAimLock()
+
+task.delay(5, function()
+    stopAimLock()
 end)
