@@ -1,5 +1,5 @@
 -- Kill Aura Variables
-local auraOn = false
+local auraOn = true
 local killDist = 100
 
 -- Helper Functions
