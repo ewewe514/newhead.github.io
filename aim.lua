@@ -1,101 +1,46 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ShootRemote  = ReplicatedStorage.Remotes.Weapon.Shoot
-local ReloadRemote = ReplicatedStorage.Remotes.Weapon.Reload
+autoCollectRunning = true
 
-local Players = game:GetService("Players")
-local workspace = game.Workspace
+local function collectItems()
+    if not workspace:FindFirstChild("RuntimeItems") then return end
 
--- Configuration
-local AutoHeadshotEnabled = true   
-local AutoReloadEnabled   = true   
-local SEARCH_RADIUS       = 350  
-local SHOOT_RADIUS        = 300  
+    local items = {
+        workspace.RuntimeItems:FindFirstChild("Rifle"),
+        workspace.RuntimeItems:FindFirstChild("RifleAmmo"),
+        workspace.RuntimeItems:FindFirstChild("Bandage"),
+        workspace.RuntimeItems:FindFirstChild("Shotgun"),
+        workspace.RuntimeItems:FindFirstChild("Revolver"),
+        workspace.RuntimeItems:FindFirstChild("ShotgunShells"),
+        workspace.RuntimeItems:FindFirstChild("Molotov"),
+        workspace.RuntimeItems:FindFirstChild("RevolverAmmo"),
+        workspace.RuntimeItems:FindFirstChild("Mauser"),
+        workspace.RuntimeItems:FindFirstChild("Snake Oil"),
+        workspace.RuntimeItems:FindFirstChild("Shovel"),
+        workspace.RuntimeItems:FindFirstChild("OpenableCrate"),
+        workspace.RuntimeItems:FindFirstChild("Navy Revolver"),
+        workspace.RuntimeItems:FindFirstChild("Bolt Action Rifle"),
+        workspace.RuntimeItems:FindFirstChild("Holy Water"),
+        workspace.RuntimeItems:FindFirstChild("Electrocutioner"),
+        workspace.RuntimeItems:FindFirstChild("Vampire Knife")
+    }
 
-local SupportedWeapons = {
-    "Revolver",
-    "Rifle",
-    "Sawed-Off Shotgun",
-    "Shotgun"
-}
+    local rs = game:GetService("ReplicatedStorage")
+    local pickUpRemote = rs:FindFirstChild("Remotes") and rs.Remotes:FindFirstChild("Tool") and rs.Remotes.Tool:FindFirstChild("PickUpTool")
+    local activateRemote = rs:FindFirstChild("Packages") and rs.Packages:FindFirstChild("RemotePromise") and rs.Packages.RemotePromise.Remotes:FindFirstChild("C_ActivateObject")
 
-local function isPlayerModel(m)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character == m then
-            return true
+    if not pickUpRemote or not activateRemote then return end
+
+    for _, item in pairs(items) do
+        if item then
+            local args = { item }
+            pickUpRemote:FireServer(unpack(args))
+            activateRemote:FireServer(unpack(args))
         end
-    end
-    return false
-end
-
-local function getEquippedSupportedWeapon()
-    local char = Players.LocalPlayer and Players.LocalPlayer.Character
-    if not char then return nil end
-    for _, name in ipairs(SupportedWeapons) do
-        local tool = char:FindFirstChild(name)
-        if tool then
-            return tool
-        end
-    end
-    return nil
-end
-
-local function findClosestNPC()
-    local closestNPC = nil
-    local closestDistance = SEARCH_RADIUS
-    local playerChar = Players.LocalPlayer.Character
-    if not playerChar then return nil end
-
-    local playerPosition = playerChar:GetPivot().Position
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and not isPlayerModel(obj) then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local head = obj:FindFirstChild("Head")
-            if hum and head and hum.Health > 0 then
-                local npcPosition = obj:GetPivot().Position
-                local dist = (npcPosition - playerPosition).Magnitude
-                
-                if dist <= SEARCH_RADIUS and dist < closestDistance then
-                    closestDistance = dist
-                    closestNPC = {model = obj, hum = hum, head = head, distance = dist}
-                end
-            end
-        end
-    end
-    return closestNPC
-end
-
-local function autoHeadshotLoop()
-    while AutoHeadshotEnabled do
-        local tool = getEquippedSupportedWeapon()
-        if tool then
-            local closestNPC = findClosestNPC()
-            if closestNPC and closestNPC.distance <= SHOOT_RADIUS then
-                local pelletTable = {}
-                if tool.Name == "Shotgun" or tool.Name == "Sawed-Off Shotgun" then
-                    for i = 1, 6 do
-                        pelletTable[tostring(i)] = closestNPC.hum
-                    end
-                else
-                    pelletTable["1"] = closestNPC.hum
-                end
-
-                -- Fire directly at NPC's head (no teleport offset)
-                ShootRemote:FireServer(
-                    workspace:GetServerTimeNow(),
-                    tool,
-                    closestNPC.head.CFrame, -- Directly targets NPC head
-                    pelletTable
-                )
-
-                -- Auto reload if enabled
-                if AutoReloadEnabled then
-                    ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
-                end
-            end
-        end
-        task.wait(0.05) -- Prevents crashes while keeping high fire rate
     end
 end
 
-task.spawn(autoHeadshotLoop)
+task.spawn(function()
+    while autoCollectRunning do
+        task.wait(0.4)
+        pcall(collectItems)
+    end
+end)
