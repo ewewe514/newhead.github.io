@@ -9,7 +9,7 @@ local workspace = game.Workspace
 local AutoHeadshotEnabled = true   
 local AutoReloadEnabled   = true   
 local SEARCH_RADIUS       = 350  
-local SHOOT_RADIUS        = 150  -- Reduced to prevent unnecessary shots
+local SHOOT_RADIUS        = 150  
 
 local SupportedWeapons = {
     "Revolver",
@@ -64,7 +64,7 @@ local function findClosestNPC()
     end
 
     if closestNPC then
-        print("Target Found:", closestNPC.model.Name, "Distance:", closestNPC.distance)
+        print("Target Found:", closestNPC.model.Name, "Head Position:", closestNPC.head.Position)
     else
         print("No valid NPC found, should NOT shoot!")
     end
@@ -77,7 +77,6 @@ local function autoHeadshotLoop()
         local tool = getEquippedSupportedWeapon()
         local closestNPC = findClosestNPC()
 
-        -- Ensure a valid NPC before shooting
         if tool and closestNPC and closestNPC.head and closestNPC.distance <= SHOOT_RADIUS then
             local pelletTable = {}
 
@@ -89,11 +88,12 @@ local function autoHeadshotLoop()
                 pelletTable["1"] = closestNPC.hum
             end
 
-            -- Fire at NPC's head
+            -- Ensure bullets target NPC head accurately
+            local aimPosition = closestNPC.head.Position + Vector3.new(0, 1, 0) 
             ShootRemote:FireServer(
                 workspace:GetServerTimeNow(),
                 tool,
-                closestNPC.head.CFrame, -- Ensures precise targeting
+                CFrame.new(aimPosition), -- Adjusted for precision aiming
                 pelletTable
             )
 
