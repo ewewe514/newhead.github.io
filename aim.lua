@@ -1,115 +1,62 @@
--- Services
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local workspace = game.Workspace
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local HRP = char:WaitForChild("HumanoidRootPart")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local ShootRemote = ReplicatedStorage.Remotes.Weapon.Shoot
-local ReloadRemote = ReplicatedStorage.Remotes.Weapon.Reload
+local range = 50
+local autoReloadEnabled = true
 
--- Configuration
-local AutoHeadshotEnabled = true   
-local AutoReloadEnabled   = true   
-local SEARCH_RADIUS       = 350  
-local SHOOT_RADIUS        = 300  
+local function getClosestEnemy()
+    local closestEnemy = nil
+    local shortestDistance = range
 
-local SupportedWeapons = {
-    "Revolver",
-    "Rifle",
-    "Sawed-Off Shotgun",
-    "Shotgun"
-}
-
--- Function to check if a model is a valid NPC
-local function isValidNPC(model)
-    local hum = model:FindFirstChildOfClass("Humanoid")
-    local head = model:FindFirstChild("Head")
-
-    -- Ensure it's a valid target, excluding horse and rifle soldier models
-    return hum and head and hum.Health > 0 and model.Name:match("Model_") 
-           and model.Name ~= "Model_Horse" and model.Name ~= "Model_RifleSoldier"
-end
-
--- Function to get the equipped weapon
-local function getEquippedSupportedWeapon()
-    local char = Players.LocalPlayer and Players.LocalPlayer.Character
-    if not char then return nil end
-    for _, name in ipairs(SupportedWeapons) do
-        local tool = char:FindFirstChild(name)
-        if tool then return tool end
-    end
-    return nil
-end
-
--- Function to find the closest valid NPC
-local function findClosestNPC()
-    local closestNPC = nil
-    local closestDistance = SEARCH_RADIUS
-    local playerChar = Players.LocalPlayer.Character
-    if not playerChar then return nil end
-
-    local playerPosition = playerChar:GetPivot().Position
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and isValidNPC(obj) then
-            local npcPosition = obj:GetPivot().Position
-            local dist = (npcPosition - playerPosition).Magnitude
-            
-            if dist <= SEARCH_RADIUS and dist < closestDistance then
-                closestDistance = dist
-                closestNPC = {model = obj, hum = obj:FindFirstChildOfClass("Humanoid"), head = obj:FindFirstChild("Head"), distance = dist}
+    for _, enemy in pairs(workspace:GetDescendants()) do
+        if enemy:IsA("Model") and enemy:FindFirstChild("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") and enemy ~= char then
+            local distance = (HRP.Position - enemy.HumanoidRootPart.Position).Magnitude
+            if distance < shortestDistance and enemy.Humanoid.Health > 0 then
+                shortestDistance = distance
+                closestEnemy = enemy
             end
         end
     end
 
-    -- Debug logging for detection issues
-    if closestNPC then
-        print("Target Found:", closestNPC.model.Name, "Distance:", closestNPC.distance)
-    else
-        print("No valid NPC found!")
-    end
-
-    return closestNPC
+    return closestEnemy
 end
 
--- Function for auto-headshots with proper target validation
-local function autoHeadshotLoop()
-    while AutoHeadshotEnabled do
-        local tool = getEquippedSupportedWeapon() -- Get the equipped weapon
-        local closestNPC = findClosestNPC()
+local function shootAt(target)
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and tool:FindFirstChild("Handle") then
+        local fireEvent = tool:FindFirstChild("Fire") or tool:FindFirstChild("RemoteEvent")
+        if fireEvent and fireEvent:IsA("RemoteEvent") then
+            fireEvent:FireServer(target.HumanoidRootPart.Position)
+        end
+    end
+end
 
-        -- Ensure a valid NPC exists before shooting
-        if tool and closestNPC and closestNPC.head and closestNPC.hum.Health > 0 and closestNPC.distance <= SHOOT_RADIUS then
-            local pelletTable = {}
+local function reloadWeapon()
+    local reloadEvent = ReplicatedStorage:FindFirstChild("ReloadEvent")
+    if reloadEvent then
+        reloadEvent:FireServer()
+    end
+end
 
-            -- Ensure shotgun types fire multiple pellets
-            if tool.Name == "Shotgun" or tool.Name == "Sawed-Off Shotgun" then
-                for i = 1, 6 do
-                    pelletTable[tostring(i)] = closestNPC.hum
+local function autoShoot()
+    while true do
+        wait(0.1)
+        local target = getClosestEnemy()
+        if target then
+            shootAt(target)
+            if autoReloadEnabled then
+                local tool = char:FindFirstChildOfClass("Tool")
+                if tool and tool:FindFirstChild("Ammo") and tool.Ammo.Value == 0 then
+                    reloadWeapon()
                 end
-            else
-                pelletTable["1"] = closestNPC.hum
             end
-
-            -- Fire at NPC's head
-            ShootRemote:FireServer(
-                workspace:GetServerTimeNow(),
-                tool,
-                closestNPC.head.CFrame, -- Ensures precise targeting
-                pelletTable
-            )
-
-            -- **Auto Reload**
-            if AutoReloadEnabled then
-                ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
-            end
-
-            print("Shot fired at:", closestNPC.model.Name)
-        else
-            print("No valid target found, NOT shooting!") -- Prevents unnecessary firing
         end
-
-        task.wait(0.05) -- Prevents crashes while maintaining high fire rate
     end
 end
 
-task.spawn(autoHeadshotLoop)
+task.spawn(autoShoot)
+
+print("[KillAura] Auto KillAura activated!")
