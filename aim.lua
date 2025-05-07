@@ -9,12 +9,14 @@ local function isNPC(obj)
         and obj.Humanoid.Health > 0
         and obj:FindFirstChild("Head")
         and obj:FindFirstChild("HumanoidRootPart")
-        and not Players:GetPlayerFromCharacter(obj)
+        and not game:GetService("Players"):GetPlayerFromCharacter(obj)
 end
 
 local function getNearestNPC()
-    local root = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    local plr = game:GetService("Players").LocalPlayer
+    local char = plr.Character or plr.CharacterAdded:Wait()
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return nil end -- Prevent nil indexing
 
     local nearest, minDist = nil, math.huge
     for _, npc in ipairs(workspace:GetDescendants()) do
@@ -22,7 +24,7 @@ local function getNearestNPC()
             local hrp = npc:FindFirstChild("HumanoidRootPart")
             local hum = npc:FindFirstChild("Humanoid")
             local dist = (hrp.Position - root.Position).Magnitude
-            if hum.Health > 0 and dist < minDist and dist <= killDist then
+            if hum and hum.Health > 0 and dist < minDist and dist <= killDist then
                 nearest, minDist = npc, dist
             end
         end
@@ -32,30 +34,33 @@ end
 
 local function shootRemote(npc)
     if not npc then return end
-    local hum = npc:FindFirstChild("Humanoid")
-    if hum and hum.Health <= 0 then return end
+    local head = npc:FindFirstChild("Head")
+    if not head then return end
 
     local shootRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Weapon"):WaitForChild("Shoot")
     if shootRemote then
-        local head = npc:FindFirstChild("Head")
-        if head then
-            local args = {head.Position} -- Only sending the head position now
-            shootRemote:FireServer(unpack(args))
-        end
+        local args = {head.Position} -- Firing at head position
+        shootRemote:FireServer(unpack(args))
+        print("Shot fired at:", head.Position) -- Debugging confirmation
     end
 end
 
 local function killAuraLoop()
     while auraOn do
         local target = getNearestNPC()
-        if target then shootRemote(target) end
+        if target then
+            print("Target found:", target.Name) -- Debugging output
+            shootRemote(target)
+        else
+            print("No valid NPC found") -- Debugging output
+        end
         task.wait(0.2)
     end
 end
 
--- Main Loop
+-- Main Loop (Prevents nil indexing)
 RunService.Heartbeat:Connect(function()
     if auraOn then
-        killAuraLoop()
+        pcall(killAuraLoop) -- Ensures no errors crash the script
     end
 end)
