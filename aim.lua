@@ -24,8 +24,9 @@ local function isValidNPC(model)
     local hum = model:FindFirstChildOfClass("Humanoid")
     local head = model:FindFirstChild("Head")
 
-    -- Only accept NPC models with "Model_" prefix to avoid false targets
-    return hum and head and hum.Health > 0 and model.Name:match("Model_")
+    -- Ensure it's a valid target, excluding horse and rifle soldier models
+    return hum and head and hum.Health > 0 and model.Name:match("Model_") 
+           and model.Name ~= "Model_Horse" and model.Name ~= "Model_RifleSoldier"
 end
 
 -- Function to get the equipped weapon
@@ -77,7 +78,7 @@ local function autoHeadshotLoop()
         local closestNPC = findClosestNPC()
 
         -- Ensure a valid NPC exists before shooting
-        if tool and closestNPC and closestNPC.head and closestNPC.distance <= SHOOT_RADIUS then
+        if tool and closestNPC and closestNPC.head and closestNPC.hum.Health > 0 and closestNPC.distance <= SHOOT_RADIUS then
             local pelletTable = {}
 
             -- Ensure shotgun types fire multiple pellets
@@ -93,7 +94,7 @@ local function autoHeadshotLoop()
             ShootRemote:FireServer(
                 workspace:GetServerTimeNow(),
                 tool,
-                closestNPC.head.CFrame, -- Ensures precise head targeting
+                closestNPC.head.CFrame, -- Ensures precise targeting
                 pelletTable
             )
 
@@ -101,6 +102,8 @@ local function autoHeadshotLoop()
             if AutoReloadEnabled then
                 ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
             end
+
+            print("Shot fired at:", closestNPC.model.Name)
         else
             print("No valid target found, NOT shooting!") -- Prevents unnecessary firing
         end
