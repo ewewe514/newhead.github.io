@@ -8,8 +8,8 @@ local workspace = game.Workspace
 -- Configuration
 local AutoHeadshotEnabled = true   
 local AutoReloadEnabled   = true   
-local SEARCH_RADIUS       = 350   
-local SHOOT_RADIUS        = 200  -- Reduced to prevent random firing
+local SEARCH_RADIUS       = 350  
+local SHOOT_RADIUS        = 150  -- Reduced to prevent unnecessary shots
 
 local SupportedWeapons = {
     "Revolver",
@@ -62,11 +62,11 @@ local function findClosestNPC()
             end
         end
     end
-    
+
     if closestNPC then
         print("Target Found:", closestNPC.model.Name, "Distance:", closestNPC.distance)
     else
-        print("No valid NPC found!")
+        print("No valid NPC found, should NOT shoot!")
     end
 
     return closestNPC
@@ -77,6 +77,7 @@ local function autoHeadshotLoop()
         local tool = getEquippedSupportedWeapon()
         local closestNPC = findClosestNPC()
 
+        -- Ensure a valid NPC before shooting
         if tool and closestNPC and closestNPC.head and closestNPC.distance <= SHOOT_RADIUS then
             local pelletTable = {}
 
@@ -88,7 +89,7 @@ local function autoHeadshotLoop()
                 pelletTable["1"] = closestNPC.hum
             end
 
-            -- Shoot directly at NPC's head
+            -- Fire at NPC's head
             ShootRemote:FireServer(
                 workspace:GetServerTimeNow(),
                 tool,
@@ -103,7 +104,7 @@ local function autoHeadshotLoop()
 
             print("Shot fired at:", closestNPC.model.Name)
         else
-            print("No valid target found, NOT shooting!") -- Prevents unnecessary firing
+            print("Skipping shot—no valid NPC found!") -- Prevents unnecessary firing
         end
 
         task.wait(0.05)
