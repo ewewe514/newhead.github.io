@@ -9,8 +9,8 @@ local ReloadRemote = ReplicatedStorage.Remotes.Weapon.Reload
 -- Configuration
 local AutoHeadshotEnabled = true   
 local AutoReloadEnabled   = true   
-local SEARCH_RADIUS       = 350  -- Detect NPCs within 350 studs
-local SHOOT_RADIUS        = 300  -- Increased auto-shoot range
+local SEARCH_RADIUS       = 350  
+local SHOOT_RADIUS        = 300  
 
 local SupportedWeapons = {
     "Revolver",
@@ -23,7 +23,9 @@ local SupportedWeapons = {
 local function isValidNPC(model)
     local hum = model:FindFirstChildOfClass("Humanoid")
     local head = model:FindFirstChild("Head")
-    return hum and head and hum.Health > 0 -- Must have Humanoid & Head, and be alive
+
+    -- Only accept NPC models with "Model_" prefix to avoid false targets
+    return hum and head and hum.Health > 0 and model.Name:match("Model_")
 end
 
 -- Function to get the equipped weapon
@@ -57,6 +59,14 @@ local function findClosestNPC()
             end
         end
     end
+
+    -- Debug logging for detection issues
+    if closestNPC then
+        print("Target Found:", closestNPC.model.Name, "Distance:", closestNPC.distance)
+    else
+        print("No valid NPC found!")
+    end
+
     return closestNPC
 end
 
