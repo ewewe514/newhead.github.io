@@ -24,15 +24,14 @@ local function collectItems()
     }
 
     local rs = game:GetService("ReplicatedStorage")
-    local pickUpRemote = rs:FindFirstChild("Remotes") and rs.Remotes:FindFirstChild("Tool") and rs.Remotes.Tool:FindFirstChild("PickUpTool")
-    local activateRemote = rs:FindFirstChild("Packages") and rs.Packages:FindFirstChild("RemotePromise") and rs.Packages.RemotePromise.Remotes:FindFirstChild("C_ActivateObject")
 
-    if not pickUpRemote or not activateRemote then return end
+    local activateRemote = rs:WaitForChild("Packages"):WaitForChild("RemotePromise"):WaitForChild("Remotes"):WaitForChild("C_ActivateObject")
+
+    if not activateRemote then return end
 
     for _, item in pairs(items) do
         if item then
             local args = { item }
-            pickUpRemote:FireServer(unpack(args))
             activateRemote:FireServer(unpack(args))
         end
     end
