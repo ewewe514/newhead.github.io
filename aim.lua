@@ -1,15 +1,24 @@
-task.spawn(function()
-    wait(8) -- Waits 5 seconds before executing
+local noclipConnection
 
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-
-    for _, part in pairs(character:GetChildren()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false -- Disables collision so you can pass through walls/ground
+local function enableNoclip()
+    if noclipConnection then return end
+    noclipConnection = game:GetService("RunService").Stepped:Connect(function()
+        local player = game.Players.LocalPlayer
+        if player.Character then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
         end
-    end
+    end)
+end
+
+task.spawn(function()
+    wait(5) -- Waits 5 seconds before activating noclip
+    enableNoclip() -- Calls the function to enable noclip
 end)
+
 
 
 
