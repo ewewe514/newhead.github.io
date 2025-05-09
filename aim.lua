@@ -1,76 +1,67 @@
-local noclipConnection
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local function enableNoclip()
-    if noclipConnection then return end
-    noclipConnection = game:GetService("RunService").Stepped:Connect(function()
-        local player = game.Players.LocalPlayer
-        if player.Character then
-            for _, part in pairs(player.Character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
+local LocalPlayer = Players.LocalPlayer
+local Camera  = Workspace.CurrentCamera
+local WeaponController = ReplicatedStorage:FindFirstChild("WeaponController",true)
+if WeaponController == nil then return end
+
+function GetWeapon()
+local Found = nil
+if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("ServerWeaponState",true) then
+local Weapon = LocalPlayer.Character:FindFirstChild("ServerWeaponState",true)
+if Weapon.Parent:IsA("Tool") then
+Found = Weapon.Parent
+end
+end
+if Found == nil then
+if LocalPlayer:FindFirstChild("Backpack") then
+for i, v in pairs(LocalPlayer:FindFirstChild("Backpack"):GetChildren()) do
+if v:IsA("Tool") and v:FindFirstChild("ServerWeaponState") then
+Found = v
+break
+end
+end
+end
+end
+return Found
 end
 
-task.spawn(function()
-    wait(5) -- Waits 5 seconds before activating noclip
-    enableNoclip() -- Calls the function to enable noclip
-end)
+function FireBullet()
+if LocalPlayer.Character then
+local WeaponTarget = GetWeapon()
+if WeaponTarget == nil then return end
+if WeaponTarget.Parent ~= LocalPlayer.Character then
+WeaponTarget.Parent = LocalPlayer.Character
+end
+require(WeaponController).FireBullet(WeaponTarget)
+end
+end
 
+function FindEvilNPC()
+local Found = nil
+for i, v in pairs(Workspace:GetDescendants()) do
+if v:GetAttribute("DangerScore") and v:FindFirstChildOfClass("Humanoid") then
+if LocalPlayer:DistanceFromCharacter(v:GetPivot().Position) <= 30 then
+Found = v
+break
+end
+end
+end
+return Found
+end
 
-
-
-task.spawn(function()
-    wait(10)
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/fjruie/bypass.github.io/refs/heads/main/ringta.lua"))()
-end)
-
-task.spawn(function()
-    wait(16)
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/ewewe514/flying.github.io/refs/heads/main/erer.lua"))()
-end)
-
-task.spawn(function()
-    wait(22)
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-
-    -- Target position
-    local targetPosition = Vector3.new(-352.05, -6.16, -49041.93)
-
-    -- Teleport
-    rootPart.CFrame = CFrame.new(targetPosition)
-end)
-
-task.spawn(function()
-    wait(60) -- Waits 1 minute
-    local camera = workspace.CurrentCamera
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
-    local rootPart = character:WaitForChild("HumanoidRootPart")
-
-    -- Set camera to first-person and force it to look directly up
-    camera.CameraType = Enum.CameraType.Scriptable
-    camera.CFrame = CFrame.new(rootPart.Position) * CFrame.Angles(math.rad(90), 0, 0) -- Looks straight up
-
-    -- Continuously spin while maintaining upward view
-    while true do
-        camera.CFrame = camera.CFrame * CFrame.Angles(0, math.rad(25), 0) -- Spins while locked on sky
-        wait(0.05) -- Adjust speed for smoother rotation
-    end
-end)
-
-
-task.spawn(function()
-    wait(480) -- Waits 8 minutes (480 seconds)
-    local prompt = workspace.Baseplates.FinalBasePlate.OutlawBase.Bridge.BridgeControl.Crank.Model.Mid.EndGame
-    prompt.HoldDuration = 0
-    
-    while true do
-        fireproximityprompt(prompt)
-        wait(5) -- Runs every 5 seconds
-    end
+RunService.RenderStepped:Connect(function()
+local CameraPosition  = Camera.CFrame.Position
+local Target = FindEvilNPC()
+if Target ~= nil then
+local Head = Target:FindFirstChild("Head")
+if Head and Target:FindFirstChildOfClass("Humanoid") and Target:FindFirstChildOfClass("Humanoid").Health ~= 0 then
+Camera.CFrame = CFrame.lookAt(CameraPosition, Head.Position)
+task.wait()
+FireBullet()
+end
+end
 end)
