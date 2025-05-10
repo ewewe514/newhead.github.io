@@ -1,26 +1,12 @@
 local positions = {
-    Vector3.new(57, -5, 30000), Vector3.new(57, -5, 28000),
-    Vector3.new(57, -5, 26000), Vector3.new(57, -5, 24000),
-    Vector3.new(57, -5, 22000), Vector3.new(57, -5, 20000),
-    Vector3.new(57, -5, 18000), Vector3.new(57, -5, 16000),
-    Vector3.new(57, -5, 14000), Vector3.new(57, -5, 12000),
-    Vector3.new(57, -5, 10000), Vector3.new(57, -5, 8000),
-    Vector3.new(57, -5, 6000), Vector3.new(57, -5, 4000),
-    Vector3.new(57, -5, 2000), Vector3.new(57, -5, 0),
-    Vector3.new(57, -5, -2000), Vector3.new(57, -5, -4000),
-    Vector3.new(57, -5, -6000), Vector3.new(57, -5, -8000),
-    Vector3.new(57, -5, -10000), Vector3.new(57, -5, -12000),
-    Vector3.new(57, -5, -14000), Vector3.new(57, -5, -16000),
-    Vector3.new(57, -5, -18000), Vector3.new(57, -5, -20000),
-    Vector3.new(57, -5, -22000), Vector3.new(57, -5, -24000),
-    Vector3.new(57, -5, -26000), Vector3.new(57, -5, -28000),
-    Vector3.new(57, -5, -30000), Vector3.new(57, -5, -32000),
-    Vector3.new(57, -5, -34000), Vector3.new(57, -5, -36000),
-    Vector3.new(57, -5, -38000), Vector3.new(57, -5, -40000),
-    Vector3.new(57, -5, -42000), Vector3.new(57, -5, -44000),
-    Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
-    Vector3.new(57, -5, -49032)
+    Vector3.new(57, -5, 21959),
+    Vector3.new(57, -5, 13973),
+    Vector3.new(57, -5, 6025),
+    Vector3.new(57, -5, -9000),
+    Vector3.new(57, -5, -25870),
+    Vector3.new(57, -5, -33844)
 }
+
 local flightSpeed = 500
 local waypointThreshold = 5
 
@@ -28,16 +14,13 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Start position is the first waypoint.
-hrp.CFrame = CFrame.new(57, -5, 30000)
+hrp.CFrame = CFrame.new(57, -5, 21959)
 
--- Flag to indicate gold bar collection is in progress
 local isCollecting = false
 
 local bv = Instance.new("BodyVelocity", hrp)
@@ -51,43 +34,44 @@ local function safeTeleport(pos)
     pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
--- Flight loop: continuously moves toward the current target waypoint.
+-- Flight loop: continuously move toward current waypoint.
 task.spawn(function()
     local targetIndex = 1
     while targetIndex <= #positions do
-        if isCollecting then
-            bv.Velocity = Vector3.new(0, 0, 0)
-            task.wait(0.05)
-        else
+        if not isCollecting then
             local targetPos = positions[targetIndex]
-            local dist = (hrp.Position - targetPos).Magnitude
-            if dist < waypointThreshold then
+            local distance = (hrp.Position - targetPos).Magnitude
+            if distance < waypointThreshold then
                 targetIndex = targetIndex + 1
+                task.wait(0.1)
             else
-                local dir = (targetPos - hrp.Position).Unit
-                bv.Velocity = dir * flightSpeed
+                local direction = (targetPos - hrp.Position).Unit
+                bv.Velocity = direction * flightSpeed
             end
-            task.wait(0.05)
+        else
+            bv.Velocity = Vector3.new(0, 0, 0)
         end
+        task.wait(0.05)
     end
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continuously scans for gold bars and collects them.
+-- Gold bar collection loop: scan and collect gold bars continuously.
 task.spawn(function()
     while true do
-        local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
         for _, item in pairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") then
                 isCollecting = true
                 local savedCFrame = hrp.CFrame
                 hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
-                task.wait(0.9) -- allow time for physics/network to settle
+                task.wait(0.9)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    local args = { parentModel }
-                    storeItemRemote:FireServer(unpack(args))
+                    for i = 1, 10 do
+                        storeItemRemote:FireServer(parentModel)
+                        task.wait(0.4)
+                    end
                 end
                 isCollecting = false
                 safeTeleport(savedCFrame)
