@@ -1,70 +1,65 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 FLYING = true
-local iyflyspeed = 500 -- Fixed speed
-
+local iyflyspeed = 500
+local FirstBlock = 30000
+local TargetZ = -49040
 local velocityHandlerName = "VelocityHandler"
 local gyroHandlerName = "GyroHandler"
-local targetZ = -49040 -- Final destination along Z-axis
-local startPosition = Vector3.new(57, -3, 30000)
-HumanoidRootPart.Position = startPosition -- Set initial position
 
-local function collectGoldBars()
-    local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
-    local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-
+local function collectGoldBars(returnPos)
+    local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
+    local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
     for _, item in pairs(goldBarFolder:GetChildren()) do
         if item:IsA("BasePart") then
-            -- Teleport 3 blocks under the GoldBar
             HumanoidRootPart.CFrame = item.CFrame + Vector3.new(0, -3, 0)
-            task.wait(1) -- Wait 1 second for collection
-
+            task.wait(1)
             local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
             if parentModel and parentModel:IsA("Model") then
                 storeItemRemote:FireServer(parentModel)
             end
         end
     end
+    HumanoidRootPart.CFrame = CFrame.new(returnPos)
+    task.wait(0.2)
 end
 
 local function enableFlying()
     local root = HumanoidRootPart
-
     local bv = Instance.new("BodyVelocity")
     bv.Name = velocityHandlerName
     bv.Parent = root
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new(0, 0, -iyflyspeed) -- Move along negative Z-axis
-
+    bv.Velocity = Vector3.new()
     local bg = Instance.new("BodyGyro")
     bg.Name = gyroHandlerName
     bg.Parent = root
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bg.P = 1000
     bg.D = 50
-    bg.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(0, 0, -1)) -- Keep orientation forward
-
-    -- Continuously collect gold bars while flying
     task.spawn(function()
-        while FLYING do
-            collectGoldBars()
-            task.wait(0.5) -- Delay before scanning again
+        while FLYING and FirstBlock > TargetZ do
+            local targetPosition = Vector3.new(57, -3, FirstBlock)
+            while (root.Position - targetPosition).Magnitude > 5 do
+                local direction = (targetPosition - root.Position).Unit
+                bv.Velocity = direction * iyflyspeed
+                task.wait(0.05)
+            end
+            bv.Velocity = Vector3.new(0, 0, 0)
+            local flightReturnPos = Vector3.new(57, -3, FirstBlock)
+            collectGoldBars(flightReturnPos)
+            task.wait(1)
+            FirstBlock = FirstBlock - 2000 
         end
-    end)
-
-    -- Stop flight when reaching target Z coordinate
-    RunService.RenderStepped:Connect(function()
-        if FLYING and root.Position.Z <= targetZ then
-            bv.Velocity = Vector3.new(0, 0, 0) -- Stop movement
-            FLYING = false
-        end
+        FLYING = false
     end)
 end
 
-enableFlying() -- Flight automatically starts when script is executed
+enableFlying()
