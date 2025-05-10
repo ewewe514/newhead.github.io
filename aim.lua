@@ -9,17 +9,18 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
 FLYING = true
 local iyflyspeed = 500
-local FirstBlock = 30000
-local TargetZ = -49040
+local FlightBlock = 30000
 local velocityHandlerName = "VelocityHandler"
 local gyroHandlerName = "GyroHandler"
 
 local function collectGoldBars(returnPos)
     local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
     local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+    local found = false
     for _, item in pairs(goldBarFolder:GetChildren()) do
         if item:IsA("BasePart") then
-            HumanoidRootPart.CFrame = item.CFrame + Vector3.new(0, -3, 0)
+            found = true
+            HumanoidRootPart.CFrame = item.CFrame + Vector3.new(0, -5, 0)
             task.wait(1)
             local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
             if parentModel and parentModel:IsA("Model") then
@@ -27,8 +28,10 @@ local function collectGoldBars(returnPos)
             end
         end
     end
-    HumanoidRootPart.CFrame = CFrame.new(returnPos)
-    task.wait(0.2)
+    if found then
+        HumanoidRootPart.CFrame = CFrame.new(returnPos)
+        task.wait(0.2)
+    end
 end
 
 local function enableFlying()
@@ -44,22 +47,18 @@ local function enableFlying()
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bg.P = 1000
     bg.D = 50
-    task.spawn(function()
-        while FLYING and FirstBlock > TargetZ do
-            local targetPosition = Vector3.new(57, -3, FirstBlock)
-            while (root.Position - targetPosition).Magnitude > 5 do
-                local direction = (targetPosition - root.Position).Unit
-                bv.Velocity = direction * iyflyspeed
-                task.wait(0.05)
-            end
-            bv.Velocity = Vector3.new(0, 0, 0)
-            local flightReturnPos = Vector3.new(57, -3, FirstBlock)
-            collectGoldBars(flightReturnPos)
-            task.wait(1)
-            FirstBlock = FirstBlock - 2000 
+    while FLYING do
+        local targetPos = Vector3.new(57, -5, FlightBlock)
+        while (root.Position - targetPos).Magnitude > 5 do
+            local dir = (targetPos - root.Position).Unit
+            bv.Velocity = dir * iyflyspeed
+            task.wait(0.05)
         end
-        FLYING = false
-    end)
+        bv.Velocity = Vector3.new(0, 0, 0)
+        collectGoldBars(Vector3.new(57, -5, FlightBlock))
+        FlightBlock = FlightBlock - 2000
+        task.wait(0.1)
+    end
 end
 
 enableFlying()
