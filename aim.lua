@@ -21,8 +21,9 @@ local positions = {
     Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
     Vector3.new(57, -5, -49032)
 }
+
 local duration = 0.9
-local goldPauseDuration = 0.9
+local timeLimit = 5
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -32,58 +33,65 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
-
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
+_G.currentFlightTarget = nil
+
 local function safeTeleport(pos)
-    pcall(function() hrp.CFrame = CFrame.new(pos) end)
+    pcall(function()
+        hrp.CFrame = CFrame.new(pos)
+    end)
 end
 
-local function collectGoldBars(returnPos)
-    local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-    local found = false
-    for _, item in ipairs(goldBarFolder:GetChildren()) do
-        if item:IsA("BasePart") then
-            found = true
-            safeTeleport(item.CFrame.p + Vector3.new(0, -5, 0))
-            task.wait(1)
-            local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
-            if parentModel and parentModel:IsA("Model") then
-                storeItemRemote:FireServer(parentModel)
+local function collectGoldBars()
+    while true do
+        local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+        for _, item in pairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") then
+                hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
+                task.wait(0.4)
+                local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
+                if parentModel and parentModel:IsA("Model") then
+                    local args = { parentModel }
+                    storeItemRemote:FireServer(unpack(args))
+                end
             end
-            task.wait(goldPauseDuration)
         end
-    end
-    if found then
-        safeTeleport(returnPos)
-        task.wait(0.2)
+        if _G.currentFlightTarget then
+            safeTeleport(_G.currentFlightTarget)
+        end
+        task.wait(0.4)
     end
 end
 
 local velocityHandlerName = "VelocityHandler"
 local gyroHandlerName = "GyroHandler"
-local root = hrp
 
+local root = hrp
 local bv = Instance.new("BodyVelocity", root)
 bv.Name = velocityHandlerName
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 bv.Velocity = Vector3.new()
-
 local bg = Instance.new("BodyGyro", root)
 bg.Name = gyroHandlerName
 bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
 
+task.spawn(collectGoldBars)
+
 for _, pos in ipairs(positions) do
-    local targetPos = pos
-    while (root.Position - targetPos).Magnitude > 5 do
-        local dir = (targetPos - root.Position).Unit
+    _G.currentFlightTarget = pos
+    local startTime = tick()
+    while (tick() - startTime) < timeLimit do
+        if (root.Position - pos).Magnitude < 5 then break end
+        local dir = (pos - root.Position).Unit
         bv.Velocity = dir * 500
         task.wait(0.05)
     end
     bv.Velocity = Vector3.new(0, 0, 0)
-    local returnPos = targetPos
-    collectGoldBars(returnPos)
+    if (root.Position - pos).Magnitude >= 5 then
+        safeTeleport(pos)
+    end
     task.wait(duration)
 end
