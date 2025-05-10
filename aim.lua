@@ -35,8 +35,10 @@ local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
 hrp.CFrame = CFrame.new(57, -5, 30000)
-
 local goldCollected = 0
+local isCollecting = false
+local processedGoldBars = {}
+
 local function safeTeleport(pos)
     pcall(function()
         hrp.CFrame = CFrame.new(pos)
@@ -51,60 +53,55 @@ bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
 
-local processedGoldBars = {}
+-- Flight loop: moves through all pathpositions unless a gold bar is being processed.
+task.spawn(function()
+    local flightSpeed = 500
+    for _, pos in ipairs(positions) do
+        while isCollecting do
+            task.wait(0.1)
+        end
+        local startTime = tick()
+        while (tick() - startTime) < timeLimit do
+            if isCollecting then
+                task.wait(0.1)
+            else
+                if (hrp.Position - pos).Magnitude < 5 then break end
+                local dir = (pos - hrp.Position).Unit
+                bv.Velocity = dir * flightSpeed
+                task.wait(0.05)
+            end
+        end
+        bv.Velocity = Vector3.new(0, 0, 0)
+        if (hrp.Position - pos).Magnitude >= 5 then
+            safeTeleport(pos)
+        end
+        task.wait(duration)
+    end
+    bv.Velocity = Vector3.new(0, 0, 0)
+end)
 
-local function processGoldBars()
-    local result = false
-    local success, ret = pcall(function()
+-- Gold bar collection loop: continuously scans for new gold bars.
+task.spawn(function()
+    while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
         for _, item in ipairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") and not processedGoldBars[item] then
                 processedGoldBars[item] = true
+                isCollecting = true
+                local savedPos = hrp.CFrame
                 safeTeleport(Vector3.new(item.Position.X, item.Position.Y - 5, item.Position.Z))
-                task.wait(0.4)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    for attempt = 1, 10 do
+                    for i = 1, 10 do
                         storeItemRemote:FireServer(parentModel)
                         task.wait(0.4)
                     end
                 end
                 goldCollected = goldCollected + 1
-                if goldCollected >= 10 then
-                    return true
-                end
+                isCollecting = false
+                safeTeleport(savedPos)
             end
         end
-        task.wait(0.2)
-        return false
-    end)
-    if success then
-        result = ret
-    else
-        result = false
+        task.wait(0.5)
     end
-    return result
-end
-
-for _, pos in ipairs(positions) do
-    if goldCollected >= 10 then break end
-    local targetPos = pos
-    local startTime = tick()
-    while (tick() - startTime) < timeLimit do
-        if (hrp.Position - targetPos).Magnitude < 5 then break end
-        local dir = (targetPos - hrp.Position).Unit
-        bv.Velocity = dir * 500
-        task.wait(0.05)
-    end
-    bv.Velocity = Vector3.new(0, 0, 0)
-    if (hrp.Position - targetPos).Magnitude >= 5 then
-        safeTeleport(targetPos)
-    end
-    task.wait(duration)
-    local reachedGoal = processGoldBars()
-    if reachedGoal then break end
-end
-
-if goldCollected >= 10 then
-    safeTeleport(Vector3.new(57, 3, 30000))
-end
+end)
