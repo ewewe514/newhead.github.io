@@ -14,14 +14,17 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
+-- Start at the first waypoint.
 hrp.CFrame = CFrame.new(57, -5, 21959)
 
 local isCollecting = false
+local processedGoldBars = {}  -- track gold bars already collected
 
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -40,13 +43,13 @@ task.spawn(function()
     while targetIndex <= #positions do
         if not isCollecting then
             local targetPos = positions[targetIndex]
-            local distance = (hrp.Position - targetPos).Magnitude
-            if distance < waypointThreshold then
+            local dist = (hrp.Position - targetPos).Magnitude
+            if dist < waypointThreshold then
                 targetIndex = targetIndex + 1
                 task.wait(0.1)
             else
-                local direction = (targetPos - hrp.Position).Unit
-                bv.Velocity = direction * flightSpeed
+                local dir = (targetPos - hrp.Position).Unit
+                bv.Velocity = dir * flightSpeed
             end
         else
             bv.Velocity = Vector3.new(0, 0, 0)
@@ -56,12 +59,16 @@ task.spawn(function()
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: scan and collect gold bars continuously.
+-- Gold bar collection loop: continuously scans for unprocessed gold bars,
+-- and if any are found, collects them all before resuming flight.
 task.spawn(function()
     while true do
+        local anyCollected = false
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
         for _, item in pairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") then
+            if item:IsA("BasePart") and not processedGoldBars[item] then
+                processedGoldBars[item] = true
+                anyCollected = true
                 isCollecting = true
                 local savedCFrame = hrp.CFrame
                 hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
@@ -73,10 +80,15 @@ task.spawn(function()
                         task.wait(0.4)
                     end
                 end
-                isCollecting = false
                 safeTeleport(savedCFrame)
             end
         end
-        task.wait(0.5)
+        if anyCollected then
+            isCollecting = false  -- only release flight once all found gold bars are processed
+            task.wait(0.5)
+        else
+            isCollecting = false
+            task.wait(0.5)
+        end
     end
 end)
