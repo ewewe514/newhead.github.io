@@ -10,6 +10,7 @@ local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 FLYING = true
 local iyflyspeed = 500
 local FlightBlock = 30000
+local TargetZ = -49040
 local velocityHandlerName = "VelocityHandler"
 local gyroHandlerName = "GyroHandler"
 
@@ -40,25 +41,27 @@ local function enableFlying()
     bv.Name = velocityHandlerName
     bv.Parent = root
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bv.Velocity = Vector3.new()
+    bv.Velocity = Vector3.new(0, 0, 0)
     local bg = Instance.new("BodyGyro")
     bg.Name = gyroHandlerName
     bg.Parent = root
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bg.P = 1000
     bg.D = 50
-    while FLYING do
+    while FLYING and FlightBlock > TargetZ do
         local targetPos = Vector3.new(57, -5, FlightBlock)
-        while (root.Position - targetPos).Magnitude > 5 do
+        repeat
             local dir = (targetPos - root.Position).Unit
             bv.Velocity = dir * iyflyspeed
             task.wait(0.05)
-        end
+        until (root.Position - targetPos).Magnitude <= 5
         bv.Velocity = Vector3.new(0, 0, 0)
-        collectGoldBars(Vector3.new(57, -5, FlightBlock))
+        local currTarget = targetPos
+        collectGoldBars(currTarget)
         FlightBlock = FlightBlock - 2000
         task.wait(0.1)
     end
+    FLYING = false
 end
 
 enableFlying()
