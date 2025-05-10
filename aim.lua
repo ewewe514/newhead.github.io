@@ -22,67 +22,58 @@ local positions = {
     Vector3.new(57, -5, -49032)
 }
 
-local duration = 0.9
-local timeLimit = 5
+local flightSpeed = 500
+local waypointThreshold = 5
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Start at (57, -5, 30000)
+-- Start at the first waypoint
 hrp.CFrame = CFrame.new(57, -5, 30000)
 
-local goldCollected = 0
 local isCollecting = false
 local processedGoldBars = {}
 
-local safeTeleport = function(pos)
-    pcall(function()
-        hrp.CFrame = CFrame.new(pos)
-    end)
-end
-
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-bv.Velocity = Vector3.new()
-
 local bg = Instance.new("BodyGyro", hrp)
 bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
 
--- Flight loop: moves sequentially through your preset pathpoints.
+local function safeTeleport(pos)
+    pcall(function() hrp.CFrame = CFrame.new(pos) end)
+end
+
+-- Flight loop: continuously moves toward the current waypoint.
 task.spawn(function()
-    local flightSpeed = 500
-    for _, targetPos in ipairs(positions) do
-        while isCollecting do
-            task.wait(0.1)
-        end
-        local startTime = tick()
-        while (tick() - startTime) < timeLimit and not isCollecting do
-            if (hrp.Position - targetPos).Magnitude < 5 then
-                break
+    local targetIndex = 1
+    while targetIndex <= #positions do
+        if isCollecting then
+            bv.Velocity = Vector3.new(0, 0, 0)
+            task.wait(0.05)
+        else
+            local targetPos = positions[targetIndex]
+            local distance = (hrp.Position - targetPos).Magnitude
+            if distance < waypointThreshold then
+                targetIndex = targetIndex + 1
+            else
+                local dir = (targetPos - hrp.Position).Unit
+                bv.Velocity = dir * flightSpeed
             end
-            local dir = (targetPos - hrp.Position).Unit
-            bv.Velocity = dir * flightSpeed
             task.wait(0.05)
         end
-        bv.Velocity = Vector3.new(0, 0, 0)
-        if (hrp.Position - targetPos).Magnitude >= 5 then
-            safeTeleport(targetPos)
-        end
-        task.wait(duration)
     end
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continually scans for any gold bar in the folder.
+-- Gold bar collection loop: continuously scans for any unprocessed gold bar.
 task.spawn(function()
     while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
@@ -90,7 +81,7 @@ task.spawn(function()
             if item:IsA("BasePart") and not processedGoldBars[item] then
                 processedGoldBars[item] = true
                 isCollecting = true
-                local savedPos = hrp.CFrame
+                local savedCFrame = hrp.CFrame
                 safeTeleport(Vector3.new(item.Position.X, item.Position.Y - 5, item.Position.Z))
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
@@ -99,9 +90,8 @@ task.spawn(function()
                         task.wait(0.4)
                     end
                 end
-                goldCollected = goldCollected + 1
                 isCollecting = false
-                safeTeleport(savedPos)
+                safeTeleport(savedCFrame)
             end
         end
         task.wait(0.1)
