@@ -14,13 +14,12 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Start at first waypoint.
+-- Begin at the first waypoint.
 hrp.CFrame = CFrame.new(57, -5, 21959)
 
 local isCollecting = false
@@ -37,7 +36,7 @@ local function safeTeleport(pos)
     pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
--- Flight loop: continuously drive to the current waypoint.
+-- Flight loop: continuously move toward the current waypoint.
 task.spawn(function()
     local targetIndex = 1
     while targetIndex <= #positions do
@@ -59,7 +58,7 @@ task.spawn(function()
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continuously scan for gold bars.
+-- Gold bar collection loop: scan and collect gold bars continuously.
 task.spawn(function()
     while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
@@ -73,12 +72,10 @@ task.spawn(function()
                 task.wait(0.9)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    for i = 1, 10 do
-                        if not (item and item.Parent) then
-                            break
-                        end
+                    local startTime = tick()
+                    while (tick() - startTime < 2) and (item and item.Parent) do
                         storeItemRemote:FireServer(parentModel)
-                        task.wait(0.4)
+                        task.wait(0.2)
                     end
                 end
                 isCollecting = false
