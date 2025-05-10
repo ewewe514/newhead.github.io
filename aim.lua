@@ -20,11 +20,11 @@ local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Start at the first waypoint.
+-- Start at first waypoint.
 hrp.CFrame = CFrame.new(57, -5, 21959)
 
 local isCollecting = false
-local processedGoldBars = {}  -- track gold bars already collected
+local processedGoldBars = {}
 
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -37,7 +37,7 @@ local function safeTeleport(pos)
     pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
--- Flight loop: continuously move toward current waypoint.
+-- Flight loop: continuously drive to the current waypoint.
 task.spawn(function()
     local targetIndex = 1
     while targetIndex <= #positions do
@@ -59,36 +59,32 @@ task.spawn(function()
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continuously scans for unprocessed gold bars,
--- and if any are found, collects them all before resuming flight.
+-- Gold bar collection loop: continuously scan for gold bars.
 task.spawn(function()
     while true do
-        local anyCollected = false
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
         for _, item in pairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") and not processedGoldBars[item] then
                 processedGoldBars[item] = true
-                anyCollected = true
                 isCollecting = true
                 local savedCFrame = hrp.CFrame
-                hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
+                -- Teleport 5 studs below the gold bar.
+                safeTeleport(item.CFrame.p + Vector3.new(0, -5, 0))
                 task.wait(0.9)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
                     for i = 1, 10 do
+                        if not (item and item.Parent) then
+                            break
+                        end
                         storeItemRemote:FireServer(parentModel)
                         task.wait(0.4)
                     end
                 end
+                isCollecting = false
                 safeTeleport(savedCFrame)
             end
         end
-        if anyCollected then
-            isCollecting = false  -- only release flight once all found gold bars are processed
-            task.wait(0.5)
-        else
-            isCollecting = false
-            task.wait(0.5)
-        end
+        task.wait(0.1)
     end
 end)
