@@ -30,72 +30,66 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
-_G.currentFlightTarget = nil
 local goldCollected = 0
-local stopScript = false
 
 local function safeTeleport(pos)
-    pcall(function() hrp.CFrame = CFrame.new(pos) end)
+    pcall(function()
+        hrp.CFrame = CFrame.new(pos)
+    end)
 end
 
-local function collectGoldBars()
-    while not stopScript do
-        local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        for _, item in pairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") then
-                hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
-                task.wait(0.9)
-                local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
-                if parentModel and parentModel:IsA("Model") then
-                    storeItemRemote:FireServer(unpack({parentModel}))
-                end
-                goldCollected = goldCollected + 1
-                if goldCollected >= 10 then
-                    stopScript = true
-                    safeTeleport(Vector3.new(57, 3, 30000))
-                    break
-                end
-            end
-        end
-        if stopScript then break end
-        if _G.currentFlightTarget then safeTeleport(_G.currentFlightTarget) end
-        task.wait(0.4)
-    end
-end
-
-local velocityHandlerName = "VelocityHandler"
-local gyroHandlerName = "GyroHandler"
-
-local root = hrp
-local bv = Instance.new("BodyVelocity", root)
-bv.Name = velocityHandlerName
+local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 bv.Velocity = Vector3.new()
-local bg = Instance.new("BodyGyro", root)
-bg.Name = gyroHandlerName
+local bg = Instance.new("BodyGyro", hrp)
 bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
 
-task.spawn(collectGoldBars)
+local function processGoldBars(currentTarget)
+    local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+    for _, item in ipairs(goldBarFolder:GetChildren()) do
+        if item:IsA("BasePart") then
+            safeTeleport(item.CFrame.p + Vector3.new(0, 5, 0))
+            wait(0.4)
+            local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
+            if parentModel and parentModel:IsA("Model") then
+                storeItemRemote:FireServer(parentModel)
+            end
+            goldCollected = goldCollected + 1
+            if goldCollected >= 10 then
+                return true
+            end
+        end
+    end
+    safeTeleport(currentTarget)
+    wait(0.2)
+    return false
+end
 
 for _, pos in ipairs(positions) do
-    if stopScript then break end
-    _G.currentFlightTarget = pos
+    if goldCollected >= 10 then break end
+    local targetPos = pos
     local startTime = tick()
     while (tick() - startTime) < timeLimit do
-        if (root.Position - pos).Magnitude < 5 then break end
-        local dir = (pos - root.Position).Unit
+        if (hrp.Position - targetPos).Magnitude < 5 then break end
+        local dir = (targetPos - hrp.Position).Unit
         bv.Velocity = dir * 500
-        task.wait(0.05)
+        wait(0.05)
     end
-    bv.Velocity = Vector3.new(0,0,0)
-    if (root.Position - pos).Magnitude >= 5 then
-        safeTeleport(pos)
+    bv.Velocity = Vector3.new(0, 0, 0)
+    if (hrp.Position - targetPos).Magnitude >= 5 then
+        safeTeleport(targetPos)
     end
-    task.wait(duration)
+    wait(duration)
+    local reachedGoal = processGoldBars(targetPos)
+    if reachedGoal then break end
+end
+
+if goldCollected >= 10 then
+    safeTeleport(Vector3.new(57, 3, 30000))
 end
