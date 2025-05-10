@@ -1,73 +1,110 @@
+local positions = {
+    Vector3.new(57, -5, 30000), Vector3.new(57, -5, 28000),
+    Vector3.new(57, -5, 26000), Vector3.new(57, -5, 24000),
+    Vector3.new(57, -5, 22000), Vector3.new(57, -5, 20000),
+    Vector3.new(57, -5, 18000), Vector3.new(57, -5, 16000),
+    Vector3.new(57, -5, 14000), Vector3.new(57, -5, 12000),
+    Vector3.new(57, -5, 10000), Vector3.new(57, -5, 8000),
+    Vector3.new(57, -5, 6000), Vector3.new(57, -5, 4000),
+    Vector3.new(57, -5, 2000), Vector3.new(57, -5, 0),
+    Vector3.new(57, -5, -2000), Vector3.new(57, -5, -4000),
+    Vector3.new(57, -5, -6000), Vector3.new(57, -5, -8000),
+    Vector3.new(57, -5, -10000), Vector3.new(57, -5, -12000),
+    Vector3.new(57, -5, -14000), Vector3.new(57, -5, -16000),
+    Vector3.new(57, -5, -18000), Vector3.new(57, -5, -20000),
+    Vector3.new(57, -5, -22000), Vector3.new(57, -5, -24000),
+    Vector3.new(57, -5, -26000), Vector3.new(57, -5, -28000),
+    Vector3.new(57, -5, -30000), Vector3.new(57, -5, -32000),
+    Vector3.new(57, -5, -34000), Vector3.new(57, -5, -36000),
+    Vector3.new(57, -5, -38000), Vector3.new(57, -5, -40000),
+    Vector3.new(57, -5, -42000), Vector3.new(57, -5, -44000),
+    Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
+    Vector3.new(57, -5, -49032)
+}
+local duration = 0.9
+local timeLimit = 5
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local hrp = Character:WaitForChild("HumanoidRootPart")
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local hrp = character:WaitForChild("HumanoidRootPart")
+local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
-local x, y = 57, -5
-local startZ, endZ, stepZ = 30000, -49032.99, 0
-hrp.CFrame = CFrame.new(x, y, startZ)
+hrp.CFrame = CFrame.new(57, -5, 30000)
 
-local FLYING = true
-local iyflyspeed = 500
-local controlModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
-local v3inf = Vector3.new(9e9, 9e9, 9e9)
-local bv = Instance.new("BodyVelocity")
-bv.Name = "VelocityHandler"
-bv.MaxForce = v3inf
+local goldCollected = 0
+local function safeTeleport(pos)
+    pcall(function()
+        hrp.CFrame = CFrame.new(pos)
+    end)
+end
+
+local bv = Instance.new("BodyVelocity", hrp)
+bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 bv.Velocity = Vector3.new()
-bv.Parent = hrp
-
-local bg = Instance.new("BodyGyro")
-bg.Name = "GyroHandler"
-bg.MaxTorque = v3inf
+local bg = Instance.new("BodyGyro", hrp)
+bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
-bg.Parent = hrp
 
-RunService.RenderStepped:Connect(function()
-    if FLYING and hrp and hrp.Parent then
-        local camera = Workspace.CurrentCamera
-        bg.CFrame = camera.CFrame
-        local moveVec = controlModule:GetMoveVector()
-        if moveVec.Magnitude < 0.1 then
-            moveVec = Vector3.new(0, 0, -1)
-        end
-        bv.Velocity = (camera.CFrame.RightVector * moveVec.X * iyflyspeed) + (-camera.CFrame.LookVector * moveVec.Z * iyflyspeed)
-        if hrp.Position.Z <= endZ then
-            bv:Destroy()
-            FLYING = false
-        end
-    end
-end)
+local processedGoldBars = {}
 
-task.spawn(function()
-    local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
-    while true do
+local function processGoldBars()
+    local result = false
+    local success, ret = pcall(function()
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        for _, item in pairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") and item.Parent then
-                local savedCFrame = hrp.CFrame
-                hrp.CFrame = CFrame.new(item.Position.X, item.Position.Y - 5, item.Position.Z)
-                task.wait(0.9)
+        for _, item in ipairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") and not processedGoldBars[item] then
+                processedGoldBars[item] = true
+                safeTeleport(Vector3.new(item.Position.X, item.Position.Y - 5, item.Position.Z))
+                task.wait(0.4)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    local maxAttempts = 10
-                    for i = 1, maxAttempts do
-                        if not (item and item.Parent and item:IsDescendantOf(goldBarFolder)) then
-                            break
-                        end
+                    for attempt = 1, 10 do
                         storeItemRemote:FireServer(parentModel)
                         task.wait(0.4)
                     end
                 end
-                task.wait(0.5)
-                hrp.CFrame = savedCFrame
+                goldCollected = goldCollected + 1
+                if goldCollected >= 10 then
+                    return true
+                end
             end
         end
-        task.wait(0.5)
+        task.wait(0.2)
+        return false
+    end)
+    if success then
+        result = ret
+    else
+        result = false
     end
-end)
+    return result
+end
+
+for _, pos in ipairs(positions) do
+    if goldCollected >= 10 then break end
+    local targetPos = pos
+    local startTime = tick()
+    while (tick() - startTime) < timeLimit do
+        if (hrp.Position - targetPos).Magnitude < 5 then break end
+        local dir = (targetPos - hrp.Position).Unit
+        bv.Velocity = dir * 500
+        task.wait(0.05)
+    end
+    bv.Velocity = Vector3.new(0, 0, 0)
+    if (hrp.Position - targetPos).Magnitude >= 5 then
+        safeTeleport(targetPos)
+    end
+    task.wait(duration)
+    local reachedGoal = processGoldBars()
+    if reachedGoal then break end
+end
+
+if goldCollected >= 10 then
+    safeTeleport(Vector3.new(57, 3, 30000))
+end
