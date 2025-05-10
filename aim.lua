@@ -7,11 +7,12 @@ local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local hrp = Character:WaitForChild("HumanoidRootPart")
 
-hrp.CFrame = CFrame.new(57, -5, 30000)
+local x, y = 57, -5
+local startZ, endZ, stepZ = 30000, -49032.99, 0
+hrp.CFrame = CFrame.new(x, y, startZ)
 
 local FLYING = true
 local iyflyspeed = 500
-local endZ = -49000
 local controlModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
 local v3inf = Vector3.new(9e9, 9e9, 9e9)
 local bv = Instance.new("BodyVelocity")
