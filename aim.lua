@@ -21,7 +21,6 @@ local positions = {
     Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
     Vector3.new(57, -5, -49032)
 }
-
 local duration = 0.9
 local timeLimit = 5
 
@@ -36,30 +35,34 @@ local hrp = char:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
 _G.currentFlightTarget = nil
+local goldCollected = 0
+local stopScript = false
 
 local function safeTeleport(pos)
-    pcall(function()
-        hrp.CFrame = CFrame.new(pos)
-    end)
+    pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
 local function collectGoldBars()
-    while true do
+    while not stopScript do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
         for _, item in pairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") then
                 hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
-                task.wait(0.4)
+                task.wait(0.9)
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    local args = { parentModel }
-                    storeItemRemote:FireServer(unpack(args))
+                    storeItemRemote:FireServer(unpack({parentModel}))
+                end
+                goldCollected = goldCollected + 1
+                if goldCollected >= 10 then
+                    stopScript = true
+                    safeTeleport(Vector3.new(57, 3, 30000))
+                    break
                 end
             end
         end
-        if _G.currentFlightTarget then
-            safeTeleport(_G.currentFlightTarget)
-        end
+        if stopScript then break end
+        if _G.currentFlightTarget then safeTeleport(_G.currentFlightTarget) end
         task.wait(0.4)
     end
 end
@@ -81,6 +84,7 @@ bg.D = 50
 task.spawn(collectGoldBars)
 
 for _, pos in ipairs(positions) do
+    if stopScript then break end
     _G.currentFlightTarget = pos
     local startTime = tick()
     while (tick() - startTime) < timeLimit do
@@ -89,7 +93,7 @@ for _, pos in ipairs(positions) do
         bv.Velocity = dir * 500
         task.wait(0.05)
     end
-    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Velocity = Vector3.new(0,0,0)
     if (root.Position - pos).Magnitude >= 5 then
         safeTeleport(pos)
     end
