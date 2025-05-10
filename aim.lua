@@ -15,6 +15,24 @@ local targetZ = -49040 -- Final destination along Z-axis
 local startPosition = Vector3.new(57, -3, 30000)
 HumanoidRootPart.Position = startPosition -- Set initial position
 
+local function collectGoldBars()
+    local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
+    local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+
+    for _, item in pairs(goldBarFolder:GetChildren()) do
+        if item:IsA("BasePart") then
+            -- Teleport 3 blocks under the GoldBar
+            HumanoidRootPart.CFrame = item.CFrame + Vector3.new(0, -3, 0)
+            task.wait(1) -- Wait 1 second for collection
+
+            local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
+            if parentModel and parentModel:IsA("Model") then
+                storeItemRemote:FireServer(parentModel)
+            end
+        end
+    end
+end
+
 local function enableFlying()
     local root = HumanoidRootPart
 
@@ -32,30 +50,11 @@ local function enableFlying()
     bg.D = 50
     bg.CFrame = CFrame.new(root.Position, root.Position + Vector3.new(0, 0, -1)) -- Keep orientation forward
 
-    -- Start gold collection while flying
+    -- Continuously collect gold bars while flying
     task.spawn(function()
         while FLYING do
-            local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
-            local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-
-            for _, item in pairs(goldBarFolder:GetChildren()) do
-                if item:IsA("BasePart") then
-                    -- Teleport 3 blocks under the GoldBar
-                    root.CFrame = item.CFrame + Vector3.new(0, -3, 0)
-                    task.wait(1) -- Wait 1 second for collection
-
-                    local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
-                    if parentModel and parentModel:IsA("Model") then
-                        local args = { parentModel }
-                        storeItemRemote:FireServer(unpack(args))
-                    end
-
-                    -- Return to original flight position after collecting
-                    root.Position = Vector3.new(root.Position.X, -3, root.Position.Z)
-                end
-            end
-
-            task.wait(0.5) -- Short delay before scanning again
+            collectGoldBars()
+            task.wait(0.5) -- Delay before scanning again
         end
     end)
 
