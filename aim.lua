@@ -21,7 +21,6 @@ local positions = {
     Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
     Vector3.new(57, -5, -49032)
 }
-
 local flightSpeed = 500
 local waypointThreshold = 5
 
@@ -29,16 +28,17 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Start at the first waypoint
+-- Start position is the first waypoint.
 hrp.CFrame = CFrame.new(57, -5, 30000)
 
+-- Flag to indicate gold bar collection is in progress
 local isCollecting = false
-local processedGoldBars = {}
 
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -51,7 +51,7 @@ local function safeTeleport(pos)
     pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
--- Flight loop: continuously moves toward the current waypoint.
+-- Flight loop: continuously moves toward the current target waypoint.
 task.spawn(function()
     local targetIndex = 1
     while targetIndex <= #positions do
@@ -60,8 +60,8 @@ task.spawn(function()
             task.wait(0.05)
         else
             local targetPos = positions[targetIndex]
-            local distance = (hrp.Position - targetPos).Magnitude
-            if distance < waypointThreshold then
+            local dist = (hrp.Position - targetPos).Magnitude
+            if dist < waypointThreshold then
                 targetIndex = targetIndex + 1
             else
                 local dir = (targetPos - hrp.Position).Unit
@@ -73,27 +73,26 @@ task.spawn(function()
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continuously scans for any unprocessed gold bar.
+-- Gold bar collection loop: continuously scans for gold bars and collects them.
 task.spawn(function()
     while true do
+        local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        for _, item in ipairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") and not processedGoldBars[item] then
-                processedGoldBars[item] = true
+        for _, item in pairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") then
                 isCollecting = true
                 local savedCFrame = hrp.CFrame
-                safeTeleport(Vector3.new(item.Position.X, item.Position.Y - 5, item.Position.Z))
+                hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
+                task.wait(0.9) -- allow time for physics/network to settle
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    for i = 1, 10 do
-                        storeItemRemote:FireServer(parentModel)
-                        task.wait(0.4)
-                    end
+                    local args = { parentModel }
+                    storeItemRemote:FireServer(unpack(args))
                 end
                 isCollecting = false
                 safeTeleport(savedCFrame)
             end
         end
-        task.wait(0.1)
+        task.wait(0.5)
     end
 end)
