@@ -1,105 +1,100 @@
-local positions = {
-    Vector3.new(57, -5, 30000), Vector3.new(57, -5, 28000),
-    Vector3.new(57, -5, 26000), Vector3.new(57, -5, 24000),
-    Vector3.new(57, -5, 22000), Vector3.new(57, -5, 20000),
-    Vector3.new(57, -5, 18000), Vector3.new(57, -5, 16000),
-    Vector3.new(57, -5, 14000), Vector3.new(57, -5, 12000),
-    Vector3.new(57, -5, 10000), Vector3.new(57, -5, 8000),
-    Vector3.new(57, -5, 6000), Vector3.new(57, -5, 4000),
-    Vector3.new(57, -5, 2000), Vector3.new(57, -5, 0),
-    Vector3.new(57, -5, -2000), Vector3.new(57, -5, -4000),
-    Vector3.new(57, -5, -6000), Vector3.new(57, -5, -8000),
-    Vector3.new(57, -5, -10000), Vector3.new(57, -5, -12000),
-    Vector3.new(57, -5, -14000), Vector3.new(57, -5, -16000),
-    Vector3.new(57, -5, -18000), Vector3.new(57, -5, -20000),
-    Vector3.new(57, -5, -22000), Vector3.new(57, -5, -24000),
-    Vector3.new(57, -5, -26000), Vector3.new(57, -5, -28000),
-    Vector3.new(57, -5, -30000), Vector3.new(57, -5, -32000),
-    Vector3.new(57, -5, -34000), Vector3.new(57, -5, -36000),
-    Vector3.new(57, -5, -38000), Vector3.new(57, -5, -40000),
-    Vector3.new(57, -5, -42000), Vector3.new(57, -5, -44000),
-    Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
-    Vector3.new(57, -5, -49032)
-}
-local duration = 0.9
-local timeLimit = 5
-
+----------------------------------
+-- Services and Variable Setup
+----------------------------------
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
-local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local hrp = Character:WaitForChild("HumanoidRootPart")
 
-local goldCollected = 0
+-- Set the initial flight position: (57, -5, 30000)
+hrp.CFrame = CFrame.new(57, -5, 30000)
 
-local function safeTeleport(pos)
-    pcall(function()
-        hrp.CFrame = CFrame.new(pos)
-    end)
-end
+----------------------------------
+-- Flight Configuration
+----------------------------------
+local FLYING = true
+local iyflyspeed = 500            -- Flight speed in studs/second
+local velocityHandlerName = "VelocityHandler"
+local gyroHandlerName = "GyroHandler"
+local v3inf = Vector3.new(9e9, 9e9, 9e9)
+local endZ = -49000              -- End flight at Z = -49000
 
-local bv = Instance.new("BodyVelocity", hrp)
-bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-bv.Velocity = Vector3.new()
-local bg = Instance.new("BodyGyro", hrp)
-bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+-- Get the Control Module for movement input.
+local controlModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
+
+-- Create BodyVelocity for movement.
+local bv = Instance.new("BodyVelocity")
+bv.Name = velocityHandlerName
+bv.MaxForce = v3inf
+bv.Velocity = Vector3.new()  -- Will be updated each frame.
+bv.Parent = hrp
+
+-- Create BodyGyro for smooth rotation.
+local bg = Instance.new("BodyGyro")
+bg.Name = gyroHandlerName
+bg.MaxTorque = v3inf
 bg.P = 1000
 bg.D = 50
+bg.Parent = hrp
 
-local function processGoldBars(currentTarget)
-    local result = false
-    local success, ret = pcall(function()
+-- Flight Loop: Uses player input if available; otherwise, defaults to moving along negative Z.
+RunService.RenderStepped:Connect(function()
+    if FLYING and hrp and hrp.Parent then
+        local camera = Workspace.CurrentCamera
+        bg.CFrame = camera.CFrame
+        local moveVec = controlModule:GetMoveVector()
+        -- If no input is detected, default to moving along negative Z.
+        if moveVec.Magnitude < 0.1 then
+            moveVec = Vector3.new(0, 0, -1)
+        end
+        bv.Velocity = (camera.CFrame.RightVector * moveVec.X * iyflyspeed) + (-camera.CFrame.LookVector * moveVec.Z * iyflyspeed)
+        
+        -- Stop flight when reaching destination.
+        if hrp.Position.Z <= endZ then
+            bv:Destroy()
+            FLYING = false
+            print("Reached destination at Z:", hrp.Position.Z)
+        end
+    end
+end)
+
+----------------------------------
+-- Gold Bar Collection Loop
+----------------------------------
+task.spawn(function()
+    local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
+    
+    while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        for _, item in ipairs(goldBarFolder:GetChildren()) do
+        
+        for _, item in pairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") then
-                safeTeleport(item.CFrame.p + Vector3.new(0, 5, 0))
-                task.wait(0.4)
+                -- Save the current flight CFrame.
+                local savedCFrame = hrp.CFrame
+
+                -- Teleport to below the gold bar: use its X and Z;
+                -- set Y to the gold bar's Y minus 5.
+                local targetPos = Vector3.new(item.Position.X, item.Position.Y - 5, item.Position.Z)
+                hrp.CFrame = CFrame.new(targetPos)
+                task.wait(0.9)  -- Wait to ensure physics and network consistency.
+
+                -- Retrieve the parent model for the gold bar.
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
                     storeItemRemote:FireServer(parentModel)
+                    print("Gold bar stored:", parentModel.Name)
                 end
-                goldCollected = goldCollected + 1
-                if goldCollected >= 10 then
-                    return true
-                end
+
+                task.wait(0.5)  -- Short delay after collection.
+                -- Return to the previously saved flight position.
+                hrp.CFrame = savedCFrame
             end
         end
-        safeTeleport(currentTarget)
-        task.wait(0.2)
-        return false
-    end)
-    if success then
-        result = ret
-    else
-        warn("Error in processGoldBars:", ret)
-        result = false
-    end
-    return result
-end
 
-for _, pos in ipairs(positions) do
-    if goldCollected >= 10 then break end
-    local targetPos = pos
-    local startTime = tick()
-    while (tick() - startTime) < timeLimit do
-        if (hrp.Position - targetPos).Magnitude < 5 then break end
-        local dir = (targetPos - hrp.Position).Unit
-        bv.Velocity = dir * 500
-        task.wait(0.05)
+        task.wait(0.5)  -- Brief pause before scanning for new gold bars.
     end
-    bv.Velocity = Vector3.new(0, 0, 0)
-    if (hrp.Position - targetPos).Magnitude >= 5 then
-        safeTeleport(targetPos)
-    end
-    task.wait(duration)
-    local reachedGoal = processGoldBars(targetPos)
-    if reachedGoal then break end
-end
-
-if goldCollected >= 10 then
-    safeTeleport(Vector3.new(57, 3, 30000))
-end
+end)
