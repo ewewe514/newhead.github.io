@@ -51,24 +51,34 @@ bg.P = 1000
 bg.D = 50
 
 local function processGoldBars(currentTarget)
-    local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-    for _, item in ipairs(goldBarFolder:GetChildren()) do
-        if item:IsA("BasePart") then
-            safeTeleport(item.CFrame.p + Vector3.new(0, 5, 0))
-            wait(0.4)
-            local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
-            if parentModel and parentModel:IsA("Model") then
-                storeItemRemote:FireServer(parentModel)
-            end
-            goldCollected = goldCollected + 1
-            if goldCollected >= 10 then
-                return true
+    local result = false
+    local success, ret = pcall(function()
+        local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+        for _, item in ipairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") then
+                safeTeleport(item.CFrame.p + Vector3.new(0, 5, 0))
+                task.wait(0.4)
+                local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
+                if parentModel and parentModel:IsA("Model") then
+                    storeItemRemote:FireServer(parentModel)
+                end
+                goldCollected = goldCollected + 1
+                if goldCollected >= 10 then
+                    return true
+                end
             end
         end
+        safeTeleport(currentTarget)
+        task.wait(0.2)
+        return false
+    end)
+    if success then
+        result = ret
+    else
+        warn("Error in processGoldBars:", ret)
+        result = false
     end
-    safeTeleport(currentTarget)
-    wait(0.2)
-    return false
+    return result
 end
 
 for _, pos in ipairs(positions) do
@@ -79,13 +89,13 @@ for _, pos in ipairs(positions) do
         if (hrp.Position - targetPos).Magnitude < 5 then break end
         local dir = (targetPos - hrp.Position).Unit
         bv.Velocity = dir * 500
-        wait(0.05)
+        task.wait(0.05)
     end
     bv.Velocity = Vector3.new(0, 0, 0)
     if (hrp.Position - targetPos).Magnitude >= 5 then
         safeTeleport(targetPos)
     end
-    wait(duration)
+    task.wait(duration)
     local reachedGoal = processGoldBars(targetPos)
     if reachedGoal then break end
 end
