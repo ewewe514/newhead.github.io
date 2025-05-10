@@ -21,6 +21,7 @@ local positions = {
     Vector3.new(57, -5, -46000), Vector3.new(57, -5, -48000),
     Vector3.new(57, -5, -49032)
 }
+
 local duration = 0.9
 local timeLimit = 5
 
@@ -34,12 +35,14 @@ local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
+-- Start at (57, -5, 30000)
 hrp.CFrame = CFrame.new(57, -5, 30000)
+
 local goldCollected = 0
 local isCollecting = false
 local processedGoldBars = {}
 
-local function safeTeleport(pos)
+local safeTeleport = function(pos)
     pcall(function()
         hrp.CFrame = CFrame.new(pos)
     end)
@@ -48,39 +51,38 @@ end
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 bv.Velocity = Vector3.new()
+
 local bg = Instance.new("BodyGyro", hrp)
 bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
 bg.P = 1000
 bg.D = 50
 
--- Flight loop: moves through all pathpositions unless a gold bar is being processed.
+-- Flight loop: moves sequentially through your preset pathpoints.
 task.spawn(function()
     local flightSpeed = 500
-    for _, pos in ipairs(positions) do
+    for _, targetPos in ipairs(positions) do
         while isCollecting do
             task.wait(0.1)
         end
         local startTime = tick()
-        while (tick() - startTime) < timeLimit do
-            if isCollecting then
-                task.wait(0.1)
-            else
-                if (hrp.Position - pos).Magnitude < 5 then break end
-                local dir = (pos - hrp.Position).Unit
-                bv.Velocity = dir * flightSpeed
-                task.wait(0.05)
+        while (tick() - startTime) < timeLimit and not isCollecting do
+            if (hrp.Position - targetPos).Magnitude < 5 then
+                break
             end
+            local dir = (targetPos - hrp.Position).Unit
+            bv.Velocity = dir * flightSpeed
+            task.wait(0.05)
         end
         bv.Velocity = Vector3.new(0, 0, 0)
-        if (hrp.Position - pos).Magnitude >= 5 then
-            safeTeleport(pos)
+        if (hrp.Position - targetPos).Magnitude >= 5 then
+            safeTeleport(targetPos)
         end
         task.wait(duration)
     end
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold bar collection loop: continuously scans for new gold bars.
+-- Gold bar collection loop: continually scans for any gold bar in the folder.
 task.spawn(function()
     while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
@@ -102,6 +104,6 @@ task.spawn(function()
                 safeTeleport(savedPos)
             end
         end
-        task.wait(0.5)
+        task.wait(0.1)
     end
 end)
