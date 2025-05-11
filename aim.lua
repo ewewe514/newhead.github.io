@@ -8,8 +8,7 @@ local positions = {
 }
 
 local flightSpeed = 500
-local waypointThreshold = 5
-local goldProximityThreshold = 30 -- Only process gold bars if they're within 30 studs of the HRP.
+local waypointThreshold = 5  -- when within 5 studs, move to the next waypoint
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -24,7 +23,7 @@ local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("
 hrp.CFrame = CFrame.new(57, -5, 21959)
 
 local isCollecting = false
-local processedGoldBars = {}
+local processedGoldBars = {}  -- tracks which gold bars have been handled
 
 local bv = Instance.new("BodyVelocity", hrp)
 bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
@@ -39,7 +38,10 @@ local function safeTeleport(pos)
     end)
 end
 
--- Flight Loop: continuously drives toward the current waypoint.
+-------------------------------
+-- Flight Loop
+-------------------------------
+-- This loop continuously drives the HRP toward the next waypoint.
 task.spawn(function()
     local targetIndex = 1
     while targetIndex <= #positions do
@@ -48,10 +50,10 @@ task.spawn(function()
             local dist = (hrp.Position - targetPos).Magnitude
             if dist < waypointThreshold then
                 targetIndex = targetIndex + 1
-                task.wait(0.1)
+                task.wait(0.1) -- small delay before changing waypoint
             else
-                local dir = (targetPos - hrp.Position).Unit
-                bv.Velocity = dir * flightSpeed
+                local direction = (targetPos - hrp.Position).Unit
+                bv.Velocity = direction * flightSpeed
             end
         else
             bv.Velocity = Vector3.new(0, 0, 0)
@@ -61,45 +63,52 @@ task.spawn(function()
     bv.Velocity = Vector3.new(0, 0, 0)
 end)
 
--- Gold Bar Batch Collection Loop:
+-------------------------------
+-- Gold Bar Collection Loop
+-------------------------------
+-- This loop continually checks for any unprocessed gold bars.
 task.spawn(function()
     while true do
         local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        local nearbyGoldBars = {}
-        -- Gather any unprocessed gold bars that are within the threshold.
-        for _, item in pairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") and (not processedGoldBars[item]) then
-                local distance = (hrp.Position - item.Position).Magnitude
-                if distance <= goldProximityThreshold then
-                    table.insert(nearbyGoldBars, item)
-                end
+        local foundAny = false
+        
+        -- First, check if there's any unprocessed gold bar.
+        for _, item in ipairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") and not processedGoldBars[item] then
+                foundAny = true
+                break
             end
         end
-
-        if #nearbyGoldBars > 0 then
+        
+        if foundAny then
             isCollecting = true
-            local savedCFrame = hrp.CFrame
-            for _, item in ipairs(nearbyGoldBars) do
-                if item and item.Parent then
-                    processedGoldBars[item] = true
+            local savedCFrame = hrp.CFrame -- Save current flight position
+            
+            -- Process every unprocessed gold bar in the folder.
+            for _, item in ipairs(goldBarFolder:GetChildren()) do
+                if item:IsA("BasePart") and not processedGoldBars[item] then
+                    processedGoldBars[item] = true  -- Mark as processed
                     -- Teleport 5 studs BELOW the gold bar.
                     safeTeleport(item.CFrame.p + Vector3.new(0, -5, 0))
-                    task.wait(0.9) -- Wait for your position to settle.
+                    task.wait(0.9) -- Wait for the position to settle.
+                    
                     local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                     if parentModel and parentModel:IsA("Model") then
-                        local startTime = tick()
-                        -- Keep firing until the gold bar is removed (or up to 2 seconds)
-                        while (item and item.Parent) and (tick() - startTime < 2) do
+                        local attemptStart = tick()
+                        -- Repeatedly fire the remote until the item is removed (or up to 2 seconds).
+                        while (item and item.Parent) and (tick() - attemptStart < 2) do
                             storeItemRemote:FireServer(parentModel)
                             task.wait(0.2)
                         end
                     end
+                    -- Proceed to the next gold bar in the batch.
                 end
             end
-            -- After processing the entire batch, return to the saved flight position.
-            safeTeleport(savedCFrame)
+            
+            safeTeleport(savedCFrame)  -- Return to the saved flight position.
             isCollecting = false
         end
+        
         task.wait(0.1)
     end
 end)
