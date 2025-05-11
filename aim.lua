@@ -16,50 +16,58 @@ local character = player.Character or player.CharacterAdded:Wait()
 local hrp = character:WaitForChild("HumanoidRootPart")
 local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
 
--- Safe teleport function
+-- Helper: Teleports the HRP to the given position safely.
 local function safeTeleport(pos)
     pcall(function() hrp.CFrame = CFrame.new(pos) end)
 end
 
-local processedGoldBars = {}  -- Keeps track of gold bars already handled
+-- Table to track gold bars that have already been processed.
+local processedGoldBars = {}
 
--- For each waypoint…
+-- Loop through each waypoint.
 for _, waypoint in ipairs(positions) do
-    -- Teleport to the waypoint.
+    -- Teleport to the current waypoint.
     safeTeleport(waypoint)
-    wait(0.5)  -- Allow time for the teleport to settle.
+    wait(0.5)  -- Allow time to settle.
     
     local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
     
-    -- Keep checking until there are no unprocessed gold bars at this waypoint.
+    -- Repeat processing until no new gold bar is found at this waypoint.
     repeat
-        local goldFound = false
+        local goldFound = false  -- Flag for finding at least one unprocessed gold bar.
+        
         for _, goldBar in ipairs(goldBarFolder:GetChildren()) do
             if goldBar:IsA("BasePart") and not processedGoldBars[goldBar] then
                 goldFound = true
-                processedGoldBars[goldBar] = true  -- Mark it as processed.
+                processedGoldBars[goldBar] = true  -- Mark this gold bar as processed.
                 
                 local savedPos = waypoint  -- Save the current waypoint position.
-                -- Teleport exactly 5 studs BELOW the gold bar.
+                -- Teleport 5 studs BELOW the gold bar.
                 safeTeleport(goldBar.CFrame.p + Vector3.new(0, -5, 0))
-                wait(0.4)  -- Wait for the character to settle.
+                wait(0.4)  -- Give a moment for settling.
                 
                 local parentModel = goldBar:FindFirstAncestorOfClass("Model") or goldBar.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    -- Keep firing the remote every 0.4 seconds until the gold bar is removed.
-                    while goldBar.Parent do
+                    local attempts = 0
+                    -- Fire the store remote every 0.4 seconds until the gold bar is removed,
+                    -- or until a maximum number of attempts (here, 10) is reached.
+                    while goldBar.Parent and attempts < 10 do
                         storeItemRemote:FireServer(parentModel)
+                        attempts = attempts + 1
                         wait(0.4)
                     end
                 end
                 
-                -- Return to the saved waypoint.
+                -- Return to the waypoint after processing this gold bar.
                 safeTeleport(savedPos)
                 wait(0.2)
             end
         end
-        if not goldFound then break end  -- No new gold bar found; exit the repeat loop.
+        
+        -- If no unprocessed gold bar was found at this waypoint, exit the repeat loop.
+        if not goldFound then break end
+        
     until false
     
-    wait(0.5)  -- Short pause before moving on to the next waypoint.
+    wait(0.5)  -- Brief pause before moving to the next waypoint.
 end
