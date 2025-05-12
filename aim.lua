@@ -1,12 +1,15 @@
 task.spawn(function()
     local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
     local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-
     local player = game:GetService("Players").LocalPlayer
     local character = player.Character or player.CharacterAdded:Wait()
     local hrp = character:WaitForChild("HumanoidRootPart")
-    local sackLabel = player.Backpack:WaitForChild("Sack"):WaitForChild("BillboardGui"):WaitForChild("TextLabel")
 
+    -- Locate player's Sack in Workspace
+    local sack = workspace:WaitForChild(player.Name):WaitForChild("Sack")
+    local sackLabel = sack:WaitForChild("StarterPack Sack BillboardGui"):WaitForChild("TextLabel")
+
+    -- Locations to teleport to
     local positions = {
         Vector3.new(57, -5, 21959),
         Vector3.new(57, -5, 13973),
@@ -16,10 +19,10 @@ task.spawn(function()
         Vector3.new(57, -5, -33844)
     }
 
-    -- Function to collect all nearby GoldBars before moving
+    -- Collect all GoldBars before teleporting
     local function collectGoldBars()
         while true do
-            -- Stop the script entirely if sack is full
+            -- **Stop entire script if sack reaches 10/10**
             if sackLabel.Text == "10/10" then
                 return false
             end
@@ -31,15 +34,15 @@ task.spawn(function()
                     for _, part in pairs(goldBar:GetChildren()) do
                         if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 400 then
                             foundGold = true
-                            
-                            -- **Spawn player -5 under the map instead of above the GoldBar**
+
+                            -- **Teleport -5 under the map instead of above GoldBar**
                             hrp.CFrame = CFrame.new(part.Position.X, -5, part.Position.Z)
-                            task.wait(0.5) -- Wait for teleport positioning
+                            task.wait(0.5) -- Let teleport settle
 
                             storeItemRemote:FireServer(goldBar)
                             task.wait(0.3) -- Delay after firing StoreItem
 
-                            -- Check sack again after collecting each item
+                            -- **Check Sack again after collecting each item**
                             if sackLabel.Text == "10/10" then
                                 return false -- Stop everything if full
                             end
@@ -60,13 +63,13 @@ task.spawn(function()
     -- Loop through locations, ensuring GoldBars are fully collected before teleporting
     while true do
         for _, pos in ipairs(positions) do
-            -- Teleport player to the **correct position (-5 on Y-axis)**
+            -- **Teleport player to -5 under the map at the correct position**
             hrp.CFrame = CFrame.new(pos.X, -5, pos.Z)
             task.wait(1) -- Let surroundings load
 
-            -- Collect GoldBars **before teleporting again**
+            -- **Collect GoldBars before teleporting again**
             if not collectGoldBars() then
-                return -- **Stop script once sack reaches 10/10**
+                return -- **Stop entire script once Sack reaches 10/10**
             end
         end
     end
