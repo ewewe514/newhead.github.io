@@ -24,42 +24,38 @@ task.spawn(function()
     local character = player.Character or player.CharacterAdded:Wait()
     local hrp = character:WaitForChild("HumanoidRootPart")
 
-    -- Find the nearest GoldBar within 500 studs
-    local function findNearestGoldBar()
-        local nearestBar = nil
-        local shortestDist = 700 -- Max search range
-
+    -- Find all nearby GoldBars within 500 studs
+    local function findNearbyGoldBars()
+        local nearbyGoldBars = {}
         for _, goldBar in pairs(goldBarFolder:GetChildren()) do
             if goldBar:IsA("Model") then
                 for _, part in pairs(goldBar:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        local dist = (part.Position - hrp.Position).Magnitude
-                        if dist < shortestDist then
-                            shortestDist = dist
-                            nearestBar = part
-                        end
+                    if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 500 then
+                        table.insert(nearbyGoldBars, part)
                     end
                 end
             end
         end
-        return nearestBar
+        return nearbyGoldBars
     end
 
-    -- Continuously scan and collect GoldBars unless stopped manually
+    -- Continuously scan and collect GoldBars
     while true do
-        local goldBar = findNearestGoldBar()
+        local goldBars = findNearbyGoldBars()
 
-        if goldBar then
-            -- **Teleport -5 under the GoldBar**
-            hrp.CFrame = CFrame.new(goldBar.Position.X, -5, goldBar.Position.Z)
-            task.wait(0.5) -- Allow teleport to settle
+        if #goldBars > 0 then
+            for _, goldBar in ipairs(goldBars) do
+                -- **Teleport -5 under the GoldBar**
+                hrp.CFrame = CFrame.new(goldBar.Position.X, -5, goldBar.Position.Z)
+                task.wait(0.1) -- Fast teleport settling
 
-            -- **Store the GoldBar**
-            storeItemRemote:FireServer(goldBar.Parent) -- Ensures child GoldBars get collected
-            task.wait(0.3) -- Short delay for processing
+                -- **Store the GoldBar**
+                storeItemRemote:FireServer(goldBar.Parent)
+                task.wait(0.3) -- Remote firing delay
+            end
         end
 
-        task.wait(0.5) -- Short delay before checking again (never stops scanning)
+        task.wait(0.1) -- Constant scanning (never stops)
     end
 end)
 
