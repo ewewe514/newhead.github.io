@@ -17,50 +17,32 @@ for _, pos in ipairs(positions) do
 end
 
 
-local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
-local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar") -- Ensuring access to GoldBars
-local player = game:GetService("Players").LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
+task.spawn(function()
+    while true do
+        local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
+        local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
 
--- Find all **valid** GoldBars (ignore SilverBars)
-local function findNearbyGoldBars()
-    local nearbyGoldBars = {}
-    
-    for _, goldBar in pairs(goldBarFolder:GetChildren()) do
-        if goldBar:IsA("Model") and goldBar.Name ~= "SilverBar" then -- Ignore SilverBars
-            table.insert(nearbyGoldBars, goldBar)
+        local player = game:GetService("Players").LocalPlayer
+        local character = player.Character or player.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
 
-            -- Include child parts from GoldBar & Prop_GoldBar
-            for _, child in pairs(goldBar:GetChildren()) do
-                if child:IsA("BasePart") and child.Name:find("GoldBar") then -- Ensure it's a GoldBar
-                    table.insert(nearbyGoldBars, child)
+        for _, item in pairs(goldBarFolder:GetChildren()) do
+            if item:IsA("BasePart") then
+                -- Teleport under the GoldBar
+                hrp.CFrame = item.CFrame + Vector3.new(0, -5, 0)
+                task.wait(0.6) -- Short delay to settle position
+
+                local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
+                if parentModel and parentModel:IsA("Model") then
+                    local args = { parentModel }
+                    storeItemRemote:FireServer(unpack(args))
                 end
             end
         end
+
+        task.wait(0.5) -- Delay before scanning again
     end
-    
-    return nearbyGoldBars
-end
-
--- Teleport & collect all **valid** GoldBars
-while true do
-    local goldBars = findNearbyGoldBars()
-
-    if #goldBars > 0 then
-        for _, goldBar in ipairs(goldBars) do
-            -- **Teleport under the GoldBar**
-            hrp.CFrame = CFrame.new(goldBar.Position.X, -5, goldBar.Position.Z)
-            task.wait(0.1) -- Fast teleport settling
-
-            -- **Store the GoldBar**
-            storeItemRemote:FireServer(goldBar.Parent) -- Ensures child GoldBars get collected
-            task.wait(0.3) -- Short delay for processing
-        end
-    end
-
-    task.wait(0.1) -- Keep scanning (never stops)
-end
+end)
 
 
 
