@@ -18,31 +18,51 @@ end
 
 
 task.spawn(function()
-    while true do
-        local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
-        local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+    local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
+    local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
 
-        local player = game:GetService("Players").LocalPlayer
-        local character = player.Character or player.CharacterAdded:Wait()
-        local hrp = character:WaitForChild("HumanoidRootPart")
+    -- Find the nearest GoldBar within 500 studs
+    local function findNearestGoldBar()
+        local nearestBar = nil
+        local shortestDist = 700 -- Max search range
 
-        for _, item in pairs(goldBarFolder:GetChildren()) do
-            if item:IsA("BasePart") then
-                -- Teleport above the GoldBar
-                hrp.CFrame = item.CFrame + Vector3.new(0, 5, 0)
-                task.wait(0.9) -- Short delay to settle position
-
-                local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
-                if parentModel and parentModel:IsA("Model") then
-                    local args = { parentModel }
-                    storeItemRemote:FireServer(unpack(args))
+        for _, goldBar in pairs(goldBarFolder:GetChildren()) do
+            if goldBar:IsA("Model") then
+                for _, part in pairs(goldBar:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        local dist = (part.Position - hrp.Position).Magnitude
+                        if dist < shortestDist then
+                            shortestDist = dist
+                            nearestBar = part
+                        end
+                    end
                 end
             end
         end
+        return nearestBar
+    end
 
-        task.wait(0.5) -- Delay before scanning again
+    -- Continuously scan and collect GoldBars unless stopped manually
+    while true do
+        local goldBar = findNearestGoldBar()
+
+        if goldBar then
+            -- **Teleport -5 under the GoldBar**
+            hrp.CFrame = CFrame.new(goldBar.Position.X, -5, goldBar.Position.Z)
+            task.wait(0.5) -- Allow teleport to settle
+
+            -- **Store the GoldBar**
+            storeItemRemote:FireServer(goldBar.Parent) -- Ensures child GoldBars get collected
+            task.wait(0.3) -- Short delay for processing
+        end
+
+        task.wait(0.5) -- Short delay before checking again (never stops scanning)
     end
 end)
+
 
 
 
