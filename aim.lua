@@ -7,9 +7,9 @@ task.spawn(function()
 
     -- Locate player's Sack in Workspace
     local sack = workspace:WaitForChild(player.Name):WaitForChild("Sack")
-    local sackLabel = sack:WaitForChild("BillboardGui"):WaitForChild("TextLabel") -- Correctly referencing the GUI
+    local sackLabel = sack:WaitForChild("BillboardGui"):WaitForChild("TextLabel")
 
-    -- Locations to teleport to
+    -- Locations to teleport to before searching for GoldBars
     local positions = {
         Vector3.new(57, -5, 21959),
         Vector3.new(57, -5, 13973),
@@ -19,64 +19,74 @@ task.spawn(function()
         Vector3.new(57, -5, -33844)
     }
 
-    -- Function to check sack capacity
-    local function getSackCount()
-        return sackLabel.Text
+    -- Check sack capacity
+    local function isSackFull()
+        return sackLabel.Text == "10/10"
     end
 
-    -- Function to collect and track GoldBars
-    local function collectGoldBars()
-        while true do
-            if getSackCount() == "10/10" then
-                print("Sack is full! Stopping script.")
-                return false -- Stop script when Sack is full
-            end
-
-            local foundGold = false
-
-            for _, goldBar in pairs(goldBarFolder:GetChildren()) do
-                if goldBar:IsA("Model") then
-                    for _, part in pairs(goldBar:GetChildren()) do
-                        if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 400 then
-                            foundGold = true
-
-                            -- **Teleport -5 below the map near the GoldBar**
-                            hrp.CFrame = CFrame.new(part.Position.X, -5, part.Position.Z)
-                            task.wait(0.5) -- Allow teleport to settle
-
-                            -- **Fire StoreItem remote to collect the GoldBar**
-                            storeItemRemote:FireServer(goldBar)
-                            task.wait(0.3) -- Short delay to ensure StoreItem processes
-
-                            -- **Print Sack Capacity Each Time a GoldBar is Collected**
-                            print("Current Sack Capacity:", getSackCount())
-
-                            -- **Check Sack again after collecting each item**
-                            if getSackCount() == "10/10" then
-                                return false -- Stop everything when Sack is full
-                            end
-                        end
+    -- Find **all nearby GoldBars** within 500 studs
+    local function findNearbyGoldBars()
+        local nearbyGoldBars = {}
+        for _, goldBar in pairs(goldBarFolder:GetChildren()) do
+            if goldBar:IsA("Model") then
+                for _, part in pairs(goldBar:GetChildren()) do
+                    if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 500 then
+                        table.insert(nearbyGoldBars, part)
                     end
                 end
             end
+        end
+        return nearbyGoldBars
+    end
 
-            if not foundGold then break end -- Stop scanning if no GoldBars are found
+    -- Collect ALL GoldBars before teleporting to the next position
+    local function collectGoldBars()
+        while true do
+            if isSackFull() then
+                print("Sack is full! Stopping script.")
+                return false
+            end
+
+            local goldBars = findNearbyGoldBars()
+
+            if #goldBars > 0 then
+                for _, goldBar in ipairs(goldBars) do
+                    -- **Teleport -5 under each GoldBar**
+                    hrp.CFrame = CFrame.new(goldBar.Position.X, -5, goldBar.Position.Z)
+                    task.wait(0.5) -- Allow teleport to settle
+
+                    -- **Store the GoldBar**
+                    storeItemRemote:FireServer(goldBar)
+                    task.wait(0.3) -- Short delay to ensure StoreItem processes
+
+                    -- **Track Sack progress dynamically**
+                    print("Current Sack Capacity:", sackLabel.Text)
+
+                    -- **Check Sack again after collecting each item**
+                    if isSackFull() then
+                        return false -- Stop everything when Sack is full
+                    end
+                end
+            else
+                break -- No more GoldBars nearby, move to the next position
+            end
+
             task.wait(0.5) -- Short delay before rechecking
         end
 
         return true -- Continue collecting at the next location
     end
 
-    -- Loop through locations, collecting and tracking Sack count
+    -- Loop through locations, scanning GoldBars **1 second after teleporting**
     while true do
         for _, pos in ipairs(positions) do
-            if getSackCount() == "10/10" then return end -- **Stop entire script when Sack is full**
+            if isSackFull() then return end -- **Stop entire script when Sack is full**
 
-            -- **Teleport player to -5 below the map at correct position**
+            -- **Teleport player to the predefined search location (-5 on Y-axis)**
             hrp.CFrame = CFrame.new(pos.X, -5, pos.Z)
-            task.wait(1) -- Allow surroundings to load
+            task.wait(1) -- Wait 1 second before searching for GoldBars
 
-            -- **Collect GoldBars before teleporting again**
+            -- **Scan up to 500 studs around the position for GoldBars, then collect**
             if not collectGoldBars() then return end -- Stop when Sack is full
         end
     end
