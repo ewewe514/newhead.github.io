@@ -16,11 +16,12 @@ task.spawn(function()
         Vector3.new(57, -5, -33844)
     }
 
+    -- Function to collect all nearby GoldBars before moving
     local function collectGoldBars()
         while true do
-            -- Stop the script if sack is full
+            -- Stop the script entirely if sack is full
             if sackLabel.Text == "10/10" then
-                return false -- Indicate collection should stop
+                return false
             end
 
             local foundGold = false
@@ -30,15 +31,17 @@ task.spawn(function()
                     for _, part in pairs(goldBar:GetChildren()) do
                         if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 400 then
                             foundGold = true
-                            hrp.CFrame = part.CFrame + Vector3.new(0, 5, 0)
-                            task.wait(0.5) -- Let teleport settle
+                            
+                            -- **Spawn player -5 under the map instead of above the GoldBar**
+                            hrp.CFrame = CFrame.new(part.Position.X, -5, part.Position.Z)
+                            task.wait(0.5) -- Wait for teleport positioning
 
                             storeItemRemote:FireServer(goldBar)
-                            task.wait(0.3) -- Keep firing StoreItem
+                            task.wait(0.3) -- Delay after firing StoreItem
 
                             -- Check sack again after collecting each item
                             if sackLabel.Text == "10/10" then
-                                return false -- Stop the loop
+                                return false -- Stop everything if full
                             end
                         end
                     end
@@ -54,13 +57,16 @@ task.spawn(function()
         return true -- Continue collecting at the next location
     end
 
+    -- Loop through locations, ensuring GoldBars are fully collected before teleporting
     while true do
         for _, pos in ipairs(positions) do
-            hrp.CFrame = CFrame.new(pos) -- Teleport to location
+            -- Teleport player to the **correct position (-5 on Y-axis)**
+            hrp.CFrame = CFrame.new(pos.X, -5, pos.Z)
             task.wait(1) -- Let surroundings load
 
+            -- Collect GoldBars **before teleporting again**
             if not collectGoldBars() then
-                return -- **Exit the entire script when sack is full**
+                return -- **Stop script once sack reaches 10/10**
             end
         end
     end
