@@ -1,116 +1,67 @@
-local positions = {
-    Vector3.new(57, -5, 21959),
-    Vector3.new(57, -5, 13973),
-    Vector3.new(57, -5, 6025),
-    Vector3.new(57, -5, -9000),
-    Vector3.new(57, -5, -25870),
-    Vector3.new(57, -5, -33844)
-}
+task.spawn(function()
+    local storeItemRemote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("StoreItem")
+    local goldBarFolder = workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
 
-local MIN_SETTLE_WAIT = 0.4   -- How long to wait after teleporting (to let physics settle)
-local REMOTE_DELAY   = 0.4    -- Delay between firing the store remote
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+    local sackLabel = player.Backpack:WaitForChild("Sack"):WaitForChild("BillboardGui"):WaitForChild("TextLabel")
 
------------------------------------------------------------------------
--- SERVICES & REFERENCES
------------------------------------------------------------------------
+    local positions = {
+        Vector3.new(57, -5, 21959),
+        Vector3.new(57, -5, 13973),
+        Vector3.new(57, -5, 6025),
+        Vector3.new(57, -5, -9000),
+        Vector3.new(57, -5, -25870),
+        Vector3.new(57, -5, -33844)
+    }
 
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
-local storeItemRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("StoreItem")
-
--- Sack check: the TextLabel inside Backpack.Sack.BillboardGui should show "10/10" when full.
-local function isSackFull()
-    -- Ensure the Sack exists and its TextLabel is accessible.
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        local sack = backpack:FindFirstChild("Sack")
-        if sack and sack:FindFirstChild("BillboardGui") then
-            local label = sack.BillboardGui:FindFirstChild("TextLabel")
-            if label and label.Text == "10/10" then
-                return true
+    local function collectGoldBars()
+        while true do
+            -- Stop the script if sack is full
+            if sackLabel.Text == "10/10" then
+                return false -- Indicate collection should stop
             end
-        end
-    end
-    return false
-end
 
------------------------------------------------------------------------
--- HELPER FUNCTION: Safe Teleport
------------------------------------------------------------------------
+            local foundGold = false
 
-local function safeTeleport(pos)
-    pcall(function()
-        hrp.CFrame = CFrame.new(pos)
-    end)
-end
+            for _, goldBar in pairs(goldBarFolder:GetChildren()) do
+                if goldBar:IsA("Model") then
+                    for _, part in pairs(goldBar:GetChildren()) do
+                        if part:IsA("BasePart") and (part.Position - hrp.Position).Magnitude <= 400 then
+                            foundGold = true
+                            hrp.CFrame = part.CFrame + Vector3.new(0, 5, 0)
+                            task.wait(0.5) -- Let teleport settle
 
------------------------------------------------------------------------
--- MAIN LOOP
------------------------------------------------------------------------
+                            storeItemRemote:FireServer(goldBar)
+                            task.wait(0.3) -- Keep firing StoreItem
 
--- processedGoldBars keeps track of those already handled so we don’t try them again.
-local processedGoldBars = {}
-
--- Run forever until the Sack is full.
-while not isSackFull() do
-    -- Cycle through each waypoint in our list.
-    for _, waypoint in ipairs(positions) do
-        if isSackFull() then break end
-
-        -- Teleport to the waypoint.
-        safeTeleport(waypoint)
-        wait(0.5)  -- Give time to settle.
-
-        -- Get the folder of gold bars (assumed to be continuously updated).
-        local goldBarFolder = Workspace:WaitForChild("RuntimeItems"):WaitForChild("GoldBar")
-        
-        -- Process ALL gold bars at this waypoint.
-        local goldFound = true
-        while goldFound and not isSackFull() do
-            goldFound = false  -- reset; we will set to true if we process any gold bar in this pass.
-            for _, goldBar in ipairs(goldBarFolder:GetChildren()) do
-                if goldBar:IsA("BasePart") and (not processedGoldBars[goldBar]) then
-                    goldFound = true
-                    processedGoldBars[goldBar] = true  -- Mark this gold bar as processed.
-
-                    local savedPosition = waypoint  -- Save current waypoint position.
-
-                    -- Teleport 5 studs BELOW the gold bar.
-                    safeTeleport(goldBar.CFrame.p + Vector3.new(0, -5, 0))
-                    wait(MIN_SETTLE_WAIT)  -- Wait for settling
-                  
-                    local parentModel = goldBar:FindFirstAncestorOfClass("Model") or goldBar.Parent
-                    if parentModel and parentModel:IsA("Model") then
-                        -- Fire the remote repeatedly until the gold bar is removed.
-                        while goldBar.Parent and not isSackFull() do
-                            storeItemRemote:FireServer(parentModel)
-                            wait(REMOTE_DELAY)
+                            -- Check sack again after collecting each item
+                            if sackLabel.Text == "10/10" then
+                                return false -- Stop the loop
+                            end
                         end
                     end
-
-                    -- Return to the waypoint after processing this gold bar.
-                    safeTeleport(savedPosition)
-                    wait(0.2)
-                end
-                if isSackFull() then
-                    break
                 end
             end
-            -- Wait a short moment before scanning for more gold bars at this location.
-            wait(0.3)
+
+            -- Stop scanning if no GoldBars were found
+            if not foundGold then break end
+
+            task.wait(0.5) -- Short pause before rechecking
         end
 
-        -- After processing gold at this waypoint, wait a bit then move to the next.
-        wait(0.5)
-        
-        if isSackFull() then break end
+        return true -- Continue collecting at the next location
     end
-    wait(0.2)  -- Brief pause before repeating the full cycle.
-end
 
-print("Sack is full (10/10); script ending.")
+    while true do
+        for _, pos in ipairs(positions) do
+            hrp.CFrame = CFrame.new(pos) -- Teleport to location
+            task.wait(1) -- Let surroundings load
+
+            if not collectGoldBars() then
+                return -- **Exit the entire script when sack is full**
+            end
+        end
+    end
+end)
