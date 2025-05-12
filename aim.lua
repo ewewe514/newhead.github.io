@@ -13,7 +13,7 @@ local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 for _, pos in ipairs(positions) do
     humanoidRootPart.CFrame = CFrame.new(pos)
-    wait(5) -- Delay before moving to the next position
+    wait(7) -- Delay before moving to the next position
 end
 
 
@@ -28,22 +28,20 @@ task.spawn(function()
 
         for _, item in pairs(goldBarFolder:GetChildren()) do
             if item:IsA("BasePart") then
-                -- Teleport under the GoldBar
                 hrp.CFrame = item.CFrame + Vector3.new(0, -5, 0)
-                task.wait(0.6) -- Short delay to settle position
+                task.wait(0.2) -- Fast teleport settling
 
                 local parentModel = item:FindFirstAncestorOfClass("Model") or item.Parent
                 if parentModel and parentModel:IsA("Model") then
-                    local args = { parentModel }
-                    storeItemRemote:FireServer(unpack(args))
+                    storeItemRemote:FireServer(parentModel)
+                    task.wait(0.3) -- Remote firing delay
                 end
             end
         end
 
-        task.wait(0.5) -- Delay before scanning again
+        task.wait(0.05) -- Faster scan cycle
     end
 end)
-
 
 
 
