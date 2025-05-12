@@ -10,7 +10,7 @@ local positions = {
     Vector3.new(57, -5, 13973),
     Vector3.new(57, -5, 6025),
     Vector3.new(57, -5, -25870),
-    Vector3.new(57, -5, -33844)
+    Vector3.new(57, -5, -33844),
     Vector3.new(57, -5, -9020),
 
 }
