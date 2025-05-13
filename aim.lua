@@ -32,7 +32,7 @@ UseSack()
 
 local function TPTo(pos)
     hrp.CFrame = CFrame.new(pos + Vector3.new(0, -5, 0))
-    task.wait(0.4)
+    task.wait(5)
 end
 
 local function getPos(model)
