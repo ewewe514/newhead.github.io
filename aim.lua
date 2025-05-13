@@ -1,168 +1,103 @@
-local plrs = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local plr = plrs.LocalPlayer
-local character = plr.Character or plr.CharacterAdded:Wait()
-local hrp = character:WaitForChild("HumanoidRootPart")
+local ShootRemote  = ReplicatedStorage.Remotes.Weapon.Shoot
+local ReloadRemote = ReplicatedStorage.Remotes.Weapon.Reload
 
-local positions = {
-    Vector3.new(57, -5, -9000),
-    Vector3.new(57, -5, 21959),
-    Vector3.new(57, -5, 13973),
-    Vector3.new(57, -5, 6025),
-    Vector3.new(57, -5, -17737),
-    Vector3.new(57, -5, -25870),
-    Vector3.new(57, -5, -33844),
-    Vector3.new(57, -5, -9020)
+local Players = game:GetService("Players")
+local workspace = game.Workspace
+local Camera = workspace.CurrentCamera
 
+-- Configuration
+local AutoHeadshotEnabled = true   
+local AutoReloadEnabled   = true   
+local SEARCH_RADIUS       = 350 -- for detection
+local SHOOT_RADIUS        = 300 -- for actual shooting
+
+local SupportedWeapons = {
+    "Revolver",
+    "Rifle",
+    "Sawed-Off Shotgun",
+    "Shotgun",
+    "Bolt-Action Rifle" -- ✅ added
 }
 
-local oldPos = hrp.Position
-local wasStored = {}
-
-local function UseSack()
-    local sack = plr.Backpack:FindFirstChild("Sack")
-    if sack then
-        plr.character:WaitForChild("Humanoid"):EquipTool(sack)
-        return true
+local function isPlayerModel(m)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Character == m then
+            return true
+        end
     end
     return false
 end
 
-UseSack()
-
-local function TPTo(pos)
-    hrp.CFrame = CFrame.new(pos + Vector3.new(0, -5, 0))
-    task.wait(0.4)
-end
-
-local function getPos(model)
-    if model:IsA("Model") then
-        if model.PrimaryPart then
-            return model.PrimaryPart.Position
-        else
-            local part = model:FindFirstChildWhichIsA("BasePart")
-            if part then return part.Position end
+local function getEquippedSupportedWeapon()
+    local char = Players.LocalPlayer and Players.LocalPlayer.Character
+    if not char then return nil end
+    for _, name in ipairs(SupportedWeapons) do
+        local tool = char:FindFirstChild(name)
+        if tool then
+            return tool
         end
     end
     return nil
 end
 
-local function FindBank(town)
-    local buildings = town:FindFirstChild("Buildings")
-    if not buildings then return nil end
-    local normal = buildings:FindFirstChild("Bank")
-    local destroyed = buildings:FindFirstChild("BankDestroyed")
-    if normal and destroyed then return {normal, destroyed}
-    elseif normal then return {normal}
-    elseif destroyed then return {destroyed}
-    end
-    return nil
-end
+local function findClosestNPC()
+    local closestNPC = nil
+    local closestDistance = SEARCH_RADIUS
+    local playerChar = Players.LocalPlayer.Character
+    if not playerChar then return nil end
 
-local function FindGold()
-    local golds = {}
-    for _, item in ipairs(workspace.RuntimeItems:GetChildren()) do
-        if item.Name == "GoldBar" and not wasStored[item] then
-            table.insert(golds, item)
-        end
-    end
-    return golds
-end
+    local playerPosition = playerChar:GetPivot().Position
 
-local function FireStore(item)
-    ReplicatedStorage.Remotes.StoreItem:FireServer(item)
-end
-
-local function isFull()
-    local sack = character:FindFirstChild("Sack") or plr.Backpack:FindFirstChild("Sack")
-    if sack then
-        local label = sack:FindFirstChild("BillboardGui") and sack.BillboardGui:FindFirstChild("TextLabel")
-        if label and (label.Text == "10/10" or label.Text == "15/15") then
-            return tonumber(label.Text:match("^(%d+)/"))
-        end
-    end
-    return nil
-end
-
-local function FireDrop(count)
-    for _ = 1, count do
-        local before = workspace.RuntimeItems:GetChildren()
-        ReplicatedStorage.Remotes.DropItem:FireServer()
-        task.wait(0.1)
-        local after = workspace.RuntimeItems:GetChildren()
-        for _, item in ipairs(after) do
-            if item.Name == "GoldBar" and not table.find(before, item) then
-                wasStored[item] = true
-            end
-        end
-    end
-end
-
-local function isFullConfig()
-    local FullSack = isFull()
-    if FullSack then
-        TPTo(oldPos)
-        FireDrop(FullSack)
-        task.wait(0.1)
-    end
-end
-
-local function StoreGold()
-    local Bars = FindGold()
-    for _, bar in ipairs(Bars) do
-        local barPos = getPos(bar)
-        if barPos then
-            TPTo(barPos)
-            FireStore(bar)
-            task.wait(0.4)
-            isFullConfig()
-        end
-    end
-end
-
-local function NoGold()
-    local Bars = FindGold()
-    if #Bars == 0 then
-        TPTo(oldPos)
-    end
-end
-
-local function CheckBanks(towns, pos)
-    local isEmpty = true
-    for _, town in ipairs(towns:GetChildren()) do
-        local townPos = getPos(town)
-        if townPos then
-            local dist = (townPos - pos).Magnitude
-            local banks = FindBank(town)
-            if banks then
-                for _, bank in ipairs(banks) do
-                    local bankPos = getPos(bank)
-                    if bankPos then
-                        TPTo(bankPos)
-                        task.wait(0.4)
-                        StoreGold()
-                        local Bars = FindGold()
-                        if #Bars > 0 then
-                            isEmpty = false
-                        end
-                    end
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("Model") and not isPlayerModel(obj) then
+            local hum = obj:FindFirstChildOfClass("Humanoid")
+            local head = obj:FindFirstChild("Head")
+            if hum and head and hum.Health > 0 then
+                local npcPosition = obj:GetPivot().Position
+                local dist = (npcPosition - playerPosition).Magnitude
+                
+                if dist <= SEARCH_RADIUS and dist < closestDistance then
+                    closestDistance = dist
+                    closestNPC = {model = obj, hum = hum, head = head, distance = dist}
                 end
             end
         end
     end
-    if isEmpty then
-        TPTo(oldPos)
+    return closestNPC
+end
+
+local function autoHeadshotLoop()
+    while AutoHeadshotEnabled do
+        local tool = getEquippedSupportedWeapon()
+        if tool then
+            local closestNPC = findClosestNPC()
+            if closestNPC and closestNPC.distance <= SHOOT_RADIUS then
+                local pelletTable = {}
+                if tool.Name == "Shotgun" or tool.Name == "Sawed-Off Shotgun" then
+                    for i = 1, 6 do
+                        pelletTable[tostring(i)] = closestNPC.hum
+                    end
+                else
+                    pelletTable["1"] = closestNPC.hum
+                end
+
+                local headPos = closestNPC.head.Position
+
+                ShootRemote:FireServer(
+                    workspace:GetServerTimeNow(),
+                    tool,
+                    CFrame.new(Camera.CFrame.Position, headPos),
+                    pelletTable
+                )
+
+                if AutoReloadEnabled then
+                    ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
+                end
+            end
+        end
+        task.wait(0.01) -- ⚡ fast shoot rate
     end
 end
 
-for i, pos in ipairs(positions) do
-    TPTo(pos)
-
-    local towns = workspace:FindFirstChild("Towns")
-    if not towns then continue end
-
-    CheckBanks(towns, pos)
-end
-
-isFullConfig()
-NoGold()
+task.spawn(autoHeadshotLoop)
