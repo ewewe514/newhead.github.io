@@ -32,13 +32,8 @@ UseSack()
 
 local function TPTo(pos)
     hrp.CFrame = CFrame.new(pos + Vector3.new(0, -5, 0))
-    
-    local startTime = tick()
-    repeat 
-        task.wait(0.4) -- Small wait time in between checks
-    until #FindGold() == 0 or (tick() - startTime) >= 5 -- Stop waiting when gold is gone or 5 sec passes
+    task.wait(0.4)
 end
-
 
 local function getPos(model)
     if model:IsA("Model") then
