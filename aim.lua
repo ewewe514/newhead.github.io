@@ -123,19 +123,7 @@ end
 local function NoGold()
     local Bars = FindGold()
     if #Bars == 0 then
-        for _, pos in ipairs(positions) do
-            TPTo(pos) -- Check every position again
-            task.wait(0.4)
-            Bars = FindGold() -- Refresh GoldBar list
-            if #Bars > 0 then
-                return -- Stop checking if gold is found
-            end
-        end
-        
-        -- If no GoldBars exist, teleport back and drop remaining gold
         TPTo(oldPos)
-        isFullConfig()
-        FireDrop(isFull()) -- Drop remaining gold in sack
     end
 end
 
@@ -162,10 +150,14 @@ local function CheckBanks(towns, pos)
             end
         end
     end
-    if isEmpty then
-        TPTo(oldPos)
-    end
+if isEmpty then
+    TPTo(oldPos)
+    task.wait(0.1)
+
+    local remainingGold = isFull() or 1 
+    FireDrop(remainingGold)
 end
+
 
 for i, pos in ipairs(positions) do
     TPTo(pos)
