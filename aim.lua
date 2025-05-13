@@ -163,6 +163,14 @@ for i, pos in ipairs(positions) do
 
     CheckBanks(towns, pos)
 end
+-- Once all locations are checked, teleport back to oldPos and drop remaining gold
+TPTo(oldPos)
+task.wait(0.5)
+
+local remainingGold = isFull() or 0 -- Get actual remaining amount
+if remainingGold > 0 then
+    FireDrop(remainingGold) -- Drop exactly what's left, no matter the amount
+end
 
 isFullConfig()
 NoGold()
