@@ -152,17 +152,15 @@ local function CheckBanks(towns, pos)
     end
     if isEmpty then
         TPTo(oldPos)
-        task.wait(0.1)
-        local remainingGold = isFull() or 1 
-        FireDrop(remainingGold)
     end
-end -- This is the missing end!
+end
 
--- Loop through positions
 for i, pos in ipairs(positions) do
     TPTo(pos)
+
     local towns = workspace:FindFirstChild("Towns")
     if not towns then continue end
+
     CheckBanks(towns, pos)
 end
 
