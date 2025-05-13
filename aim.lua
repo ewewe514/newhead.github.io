@@ -13,6 +13,7 @@ local positions = {
     Vector3.new(57, -5, -25870),
     Vector3.new(57, -5, -33844),
     Vector3.new(57, -5, -9020)
+
 }
 
 local oldPos = hrp.Position
@@ -31,7 +32,7 @@ UseSack()
 
 local function TPTo(pos)
     hrp.CFrame = CFrame.new(pos + Vector3.new(0, -5, 0))
-    task.wait(1.25) -- Small delay for smooth teleporting
+    task.wait(1)
 end
 
 local function getPos(model)
@@ -107,45 +108,22 @@ local function isFullConfig()
 end
 
 local function StoreGold()
-    while true do
-        local Bars = FindGold()
-        if #Bars == 0 then break end -- Stop when no more GoldBars exist in the location
-        
-        for _, bar in ipairs(Bars) do
-            local barPos = getPos(bar)
-            if barPos then
-                TPTo(barPos)
-                FireStore(bar)
-                task.wait(0.5) -- Allow time for collection
-                isFullConfig()
-            end
+    local Bars = FindGold()
+    for _, bar in ipairs(Bars) do
+        local barPos = getPos(bar)
+        if barPos then
+            TPTo(barPos)
+            FireStore(bar)
+            task.wait(0.4)
+            isFullConfig()
         end
-        task.wait(1) -- Additional wait time to ensure GoldBars are collected
     end
 end
 
 local function NoGold()
     local Bars = FindGold()
-
     if #Bars == 0 then
-        -- Check all positions again to confirm no gold is left
-        for _, pos in ipairs(positions) do
-            TPTo(pos)
-            task.wait(0.4)
-            Bars = FindGold()
-            if #Bars > 0 then
-                return -- Stop checking if gold is found
-            end
-        end
-
-        -- No gold anywhere, teleport back and drop ALL remaining gold
         TPTo(oldPos)
-        task.wait(0.5)
-
-        local remainingGold = isFull() or 0 -- Get actual remaining amount
-        if remainingGold > 0 then
-            FireDrop(remainingGold) -- Drop exactly what's left, no matter the amount
-        end
     end
 end
 
@@ -154,6 +132,7 @@ local function CheckBanks(towns, pos)
     for _, town in ipairs(towns:GetChildren()) do
         local townPos = getPos(town)
         if townPos then
+            local dist = (townPos - pos).Magnitude
             local banks = FindBank(town)
             if banks then
                 for _, bank in ipairs(banks) do
@@ -176,7 +155,6 @@ local function CheckBanks(towns, pos)
     end
 end
 
--- Loop through positions, collecting gold until every location is cleared
 for i, pos in ipairs(positions) do
     TPTo(pos)
 
@@ -184,15 +162,6 @@ for i, pos in ipairs(positions) do
     if not towns then continue end
 
     CheckBanks(towns, pos)
-end
-
--- Once all locations are checked, teleport back to oldPos and drop remaining gold
-TPTo(oldPos)
-task.wait(0.5)
-
-local remainingGold = isFull() or 0 -- Get actual remaining amount
-if remainingGold > 0 then
-    FireDrop(remainingGold) -- Drop exactly what's left, no matter the amount
 end
 
 isFullConfig()
