@@ -6,18 +6,20 @@ local Players = game:GetService("Players")
 local workspace = game.Workspace
 local Camera = workspace.CurrentCamera
 
--- Configuration
-local AutoHeadshotEnabled = true   
-local AutoReloadEnabled   = true   
-local SEARCH_RADIUS       = 350 -- for detection
-local SHOOT_RADIUS        = 300 -- for actual shooting
+
+local AutoHeadshotEnabled = true
+local AutoReloadEnabled   = true
+local SEARCH_RADIUS       = 350
+local SHOOT_RADIUS        = 300
+
 
 local SupportedWeapons = {
     "Revolver",
     "Rifle",
     "Sawed-Off Shotgun",
     "Shotgun",
-    "Bolt-Action Rifle" -- ✅ added
+    "Bolt-Action Rifle",
+    "Mauser C96"
 }
 
 local function isPlayerModel(m)
@@ -82,12 +84,15 @@ local function autoHeadshotLoop()
                     pelletTable["1"] = closestNPC.hum
                 end
 
+               
                 local headPos = closestNPC.head.Position
+                local headLook = closestNPC.head.CFrame.LookVector
+                local behindHead = headPos + (headLook * -0.5) -- half a stud behind
 
                 ShootRemote:FireServer(
                     workspace:GetServerTimeNow(),
                     tool,
-                    CFrame.new(Camera.CFrame.Position, headPos),
+                    CFrame.new(behindHead, headPos), -- start behind head, look at head
                     pelletTable
                 )
 
@@ -96,7 +101,7 @@ local function autoHeadshotLoop()
                 end
             end
         end
-        task.wait(0.01) -- ⚡ fast shoot rate
+        task.wait(0.01) 
     end
 end
 
