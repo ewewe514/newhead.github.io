@@ -1,108 +1,87 @@
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ShootRemote  = ReplicatedStorage.Remotes.Weapon.Shoot
-local ReloadRemote = ReplicatedStorage.Remotes.Weapon.Reload
+loadstring(game:HttpGet("https://raw.githubusercontent.com/Nasrali11448/FaxvKM/refs/heads/main/Cheat"))()
 
-local Players = game:GetService("Players")
-local workspace = game.Workspace
-local Camera = workspace.CurrentCamera
+    local player = game:GetService("Players").LocalPlayer
+    local gui, button
 
-
-local AutoHeadshotEnabled = true
-local AutoReloadEnabled   = true
-local SEARCH_RADIUS       = 350
-local SHOOT_RADIUS        = 300
-
-
-local SupportedWeapons = {
-    "Revolver",
-    "Rifle",
-    "Sawed-Off Shotgun",
-    "Shotgun",
-    "Bolt-Action Rifle",
-    "Mauser C96"
-}
-
-local function isPlayerModel(m)
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p.Character == m then
-            return true
+    for _, child in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+        local success, frame = pcall(function()
+            return child:FindFirstChild("Frame")
+        end)
+        if success and frame and frame:FindFirstChildWhichIsA("TextButton") then
+            gui = child
+            button = frame:FindFirstChildWhichIsA("TextButton")
+            break
         end
     end
-    return false
-end
 
-local function getEquippedSupportedWeapon()
-    local char = Players.LocalPlayer and Players.LocalPlayer.Character
-    if not char then return nil end
-    for _, name in ipairs(SupportedWeapons) do
-        local tool = char:FindFirstChild(name)
-        if tool then
-            return tool
-        end
-    end
-    return nil
-end
-
-local function findClosestNPC()
-    local closestNPC = nil
-    local closestDistance = SEARCH_RADIUS
-    local playerChar = Players.LocalPlayer.Character
-    if not playerChar then return nil end
-
-    local playerPosition = playerChar:GetPivot().Position
-
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and not isPlayerModel(obj) then
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local head = obj:FindFirstChild("Head")
-            if hum and head and hum.Health > 0 then
-                local npcPosition = obj:GetPivot().Position
-                local dist = (npcPosition - playerPosition).Magnitude
-                
-                if dist <= SEARCH_RADIUS and dist < closestDistance then
-                    closestDistance = dist
-                    closestNPC = {model = obj, hum = hum, head = head, distance = dist}
-                end
+    if gui and button then
+        gui.Enabled = false
+        task.wait(1)
+        pcall(function()
+            for _, connection in pairs(getconnections(button.MouseButton1Click)) do
+                connection:Fire()
             end
-        end
+        end)
     end
-    return closestNPC
-end
 
-local function autoHeadshotLoop()
-    while AutoHeadshotEnabled do
-        local tool = getEquippedSupportedWeapon()
-        if tool then
-            local closestNPC = findClosestNPC()
-            if closestNPC and closestNPC.distance <= SHOOT_RADIUS then
-                local pelletTable = {}
-                if tool.Name == "Shotgun" or tool.Name == "Sawed-Off Shotgun" then
-                    for i = 1, 6 do
-                        pelletTable[tostring(i)] = closestNPC.hum
+    wait(3)
+
+    local Crank_Cooldown = 600
+    local Crank_StartTime = tick() - workspace.DistributedGameTime
+    local character = player.Character or player.CharacterAdded:Wait()
+    local hrp = character:WaitForChild("HumanoidRootPart")
+
+    local gui2 = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+    gui2.Name = "CooldownTimer"
+
+    local label = Instance.new("TextLabel", gui2)
+    label.Size = UDim2.new(0, 200, 0, 30)
+    label.Position = UDim2.new(1, -210, 0, 10)
+    label.BackgroundTransparency = 0.5
+    label.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.SourceSansBold
+    label.TextScaled = true
+
+    task.spawn(function()
+        local timePassed = tick() - Crank_StartTime
+        local timeLeft = math.max(0, Crank_Cooldown - timePassed)
+
+        if timeLeft > 0 and hrp then
+        wait(1)
+            hrp.CFrame = CFrame.new(-338, 3, -49045)
+        end
+
+        while true do
+            timePassed = tick() - Crank_StartTime
+            timeLeft = math.max(0, Crank_Cooldown - timePassed)
+            local minutes = math.floor(timeLeft / 60)
+            local seconds = math.floor(timeLeft % 60)
+
+            if timeLeft <= 0 then
+                label.Text = "Ready"
+                task.wait(2)
+                gui2:Destroy()
+
+                if hrp then
+                    hrp.CFrame = CFrame.new(-338, 3, -49045)
+                end
+                wait(1)
+
+                if fireproximityprompt then
+                    for _, descendant in ipairs(workspace:GetDescendants()) do
+                        if descendant:IsA("ProximityPrompt") then
+                            pcall(function()
+                                fireproximityprompt(descendant)
+                            end)
+                        end
                     end
-                else
-                    pelletTable["1"] = closestNPC.hum
                 end
-
-               
-                local headPos = closestNPC.head.Position
-                local headLook = closestNPC.head.CFrame.LookVector
-                local behindHead = headPos + (headLook * -0.5) -- half a stud behind
-
-                ShootRemote:FireServer(
-                    workspace:GetServerTimeNow(),
-                    tool,
-                    CFrame.new(behindHead, headPos), -- start behind head, look at head
-                    pelletTable
-                )
-
-                if AutoReloadEnabled then
-                    ReloadRemote:FireServer(workspace:GetServerTimeNow(), tool)
-                end
+                break
+            else
+                label.Text = string.format("%02d:%02d", minutes, seconds)
             end
-        end
-        task.wait(0.01) 
-    end
-end
 
-task.spawn(autoHeadshotLoop)
+            task.wait(1)
+        end
+    end)
